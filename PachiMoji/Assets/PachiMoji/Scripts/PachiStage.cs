@@ -11,7 +11,7 @@ namespace PachiMoji
     /// 動画の書き出しでも、アプリで再生しても、同じ時刻なら同じ絵になる。
     ///
     /// 流れ（参考動画の調査より）：
-    ///   プチュン（青白い閃光 → 中心の光の点と青い電気 → 消える）→ 暗転・無音 → チラ見せ（1文字ずつ、立体を回り込んで映す。あいだに暗転、だんだん速く）
+    ///   プチュン（白い閃光 → レンズフレアが点滅してしぼむ＋青い電気 → 消える）→ 暗転・無音 → チラ見せ（1文字ずつ、立体を回り込んで映す。あいだに暗転、だんだん速く）
     ///   → 文字の裏から光が吹き出す → 青・白の閃光 → 銀の文字が飛んできてドン
     ///   → 昇格（前ぶれ→白く飛ぶ→一瞬で金に切り替え＋跳ねる）→ 紫の光線で切り裂かれて灰色に固まる（タメ）
     ///   → 一気に虹（1回転→止まる→1回転）→ 余韻（背景の色が切り替わり続ける）
@@ -232,7 +232,7 @@ namespace PachiMoji
             float bgMode = 0, bgGain = 1, bgCore = 1, bgBolts = 1, bgSparks = 1, bgRays = 0, bgReach = 2, fgRays = 0, fgReach = 2;
             float glint = 0;
             float slash = 0, slashProg = 0, gray = 0;
-            float pFlash = 0, pDot = 0, pArc = 0;   // プチュンの閃光・光の点・電気
+            float pFlash = 0, pDot = 0, pArc = 0, pScale = 1;   // プチュンの閃光・フレア・電気・フレアの大きさ
 
             if (t < Rumble)
             {
@@ -241,10 +241,16 @@ namespace PachiMoji
                 if (t >= PuchunAt)
                 {
                     float q = t - PuchunAt;
-                    pFlash = q < 0.07f ? 1f : Mathf.Exp(-(q - 0.07f) * 75);   // 一瞬で消える（灰色を残さない）
-                    float fade = 1 - Clamp01((q - 0.65f) / 0.3f);              // 点と電気が消えていく
-                    pDot = Clamp01(q / 0.05f) * fade * fade;
-                    pArc = q > 0.06f && q < 0.75f ? (0.7f + 0.3f * Mathf.Sin(t * 90)) * (1 - Clamp01((q - 0.5f) / 0.25f)) : 0;
+                    // 頭の2コマだけ白い閃光（インパクト）
+                    pFlash = q < 0.067f ? 1f : Mathf.Exp(-(q - 0.067f) * 75);
+                    // フレア：5コマほど点滅 → 15コマほどで一気にしぼんで消える（急に上がって長く尾を引く）
+                    float blink = q < 0.17f ? (((int)(q * 30) % 2 == 0) ? 1f : 0.55f) : 1f;
+                    float fall = Mathf.Exp(-Mathf.Max(0, q - 0.17f) * 10);
+                    pDot = Clamp01(q / 0.03f) * blink * fall * 1.3f;
+                    pScale = Mathf.Lerp(0.35f, 1.15f, fall) * (1 + 0.15f * Mathf.Exp(-q * 20));
+                    if (pDot < 0.01f) pDot = 0;
+                    // 電気：フレアの芯のまわりで少しだけバチバチ
+                    pArc = q > 0.06f && q < 0.5f ? (0.45f + 0.25f * Mathf.Sin(t * 90)) * fall : 0;
                     shake = 0.02f * Mathf.Exp(-q * 8);
                 }
             }
@@ -422,6 +428,7 @@ namespace PachiMoji
             raysMat.SetFloat("_PFlash", pFlash);
             raysMat.SetFloat("_PDot", pDot);
             raysMat.SetFloat("_PArc", pArc);
+            raysMat.SetFloat("_PScale", pScale);
             flashMat.SetColor("_Color", flash);
         }
     }

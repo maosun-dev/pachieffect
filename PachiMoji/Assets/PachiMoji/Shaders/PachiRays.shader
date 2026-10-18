@@ -13,6 +13,7 @@ Shader "PachiMoji/Rays"
         _PFlash ("Puchun Flash", Float) = 0
         _PDot ("Puchun Dot", Float) = 0
         _PArc ("Puchun Arcs", Float) = 0
+        _PScale ("Puchun Flare Scale", Float) = 1
     }
     SubShader
     {
@@ -28,7 +29,7 @@ Shader "PachiMoji/Rays"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc;
+                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc, _PScale;
             CBUFFER_END
             float4 vert(float4 pos : POSITION) : SV_POSITION { return TransformObjectToHClip(pos.xyz); }
 
@@ -90,10 +91,26 @@ Shader "PachiMoji/Rays"
                     float3 ice = float3(0.55, 0.75, 1.0);
                     // 青白い閃光：画面いっぱい＋真ん中に横長の光の筋
                     c += (float3(0.75, 0.85, 1.0) * (0.9 - 0.35 * saturate(r)) + float3(1, 1, 1) * exp(-abs(p.y) * 22) * 1.5) * _PFlash;
-                    // 中心の光の点と、細い横の光の筋（レンズのフレア）
-                    float dot0 = exp(-r * r * 2500) * 4 + exp(-r * 40) * 0.6;
-                    float streak = exp(-abs(p.y) * 420) * exp(-abs(p.x) * 3.5) * 2.2;
-                    c += (float3(1, 1, 1) * dot0 + ice * streak) * _PDot;
+                    // レンズフレア（参考：プチュンEFの作り方）。_PScale で全体の大きさ
+                    float sc = max(_PScale, 0.05);
+                    float2 q = p / sc; float rq = length(q);
+                    // 芯とにじみ
+                    float core = exp(-rq * rq * 900) * 5 + exp(-rq * 14) * 1.2 + exp(-rq * 4) * 0.25;
+                    // 十字：横に長い筋＋縦の短い筋。外へ少しぼかす（細い芯＋太いぼかし）
+                    float hx = exp(-abs(q.y) * 380) * exp(-abs(q.x) * 1.6) * 2.6 + exp(-abs(q.y) * 60) * exp(-abs(q.x) * 3.5) * 0.45;
+                    float vy = exp(-abs(q.x) * 420) * exp(-abs(q.y) * 4.0) * 1.8 + exp(-abs(q.x) * 70) * exp(-abs(q.y) * 7) * 0.3;
+                    // 光の輪（ハロー）：赤は少し外、青は少し内にずらして虹色のにじみ
+                    float3 halo = float3(exp(-pow((rq - 0.205) / 0.022, 2)), exp(-pow((rq - 0.195) / 0.022, 2)), exp(-pow((rq - 0.185) / 0.022, 2))) * 0.2
+                                + float3(exp(-pow((rq - 0.42) / 0.06, 2)), exp(-pow((rq - 0.40) / 0.06, 2)), exp(-pow((rq - 0.38) / 0.06, 2))) * 0.07;
+                    // ゴースト：中心を通る斜めの線上に並ぶ、うすい円
+                    float2 gd = normalize(float2(1, -0.55));
+                    float ghost = 0;
+                    ghost += smoothstep(0.05, 0.035, length(q - gd * 0.55)) * 0.25;
+                    ghost += smoothstep(0.03, 0.018, length(q + gd * 0.35)) * 0.3;
+                    ghost += smoothstep(0.09, 0.07, length(q + gd * 0.8)) * 0.12;
+                    float3 tint = lerp(ice, float3(1, 1, 1), 0.35);
+                    c += (float3(1, 1, 1) * core + tint * (hx + vy) + halo * float3(1.0, 0.9, 1.1) + ice * ghost) * _PDot;
+
                     // 青い電気：中心の近くから、主に左右へ走るギザギザの線。形はすぐ変わる
                     float arcs = 0;
                     float tb = floor(_T * 18);
