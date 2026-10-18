@@ -5,3 +5,5 @@ captures/*.mp4
 captures/movie_*_sheet.png
 captures/frames/
 captures/play_*.png
+captures/unity-test.log
+captures/test-results.xml

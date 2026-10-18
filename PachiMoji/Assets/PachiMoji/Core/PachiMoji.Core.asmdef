@@ -1,0 +1,6 @@
+{
+  "name": "PachiMoji.Core",
+  "rootNamespace": "PachiMoji",
+  "references": [],
+  "autoReferenced": true
+}
