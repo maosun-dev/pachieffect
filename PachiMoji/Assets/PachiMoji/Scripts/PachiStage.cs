@@ -49,6 +49,8 @@ namespace PachiMoji
         public PachiText.Rig rig;
         Material bgMat, flashMat, raysMat;
         PachiSparks sparks;   // ドンではじける火花
+        /// <summary>ドンの火花を出すか（好みで消せる）</summary>
+        public bool SparksOn = true;
         Transform bg; float aspect;
         const float BgDist = 60;
         int teaseCount;
@@ -104,7 +106,7 @@ namespace PachiMoji
             var b = go.GetComponent<MeshRenderer>().bounds;
 
             // ドンではじける火花
-            st.sparks = PachiSparks.Build(b.center, b.size, 140, StableHash(string.Concat(lines)) + 1);
+            st.sparks = PachiSparks.Build(b.center, b.size, 90, StableHash(string.Concat(lines)) + 1);
 
             // カメラ
             var camGo = new GameObject("Camera");
@@ -434,7 +436,7 @@ namespace PachiMoji
             var sh = new Vector3(Hash(t * 31.7f) - 0.5f, Hash(t * 17.3f + 4) - 0.5f, 0) * 2 * shake;
             tr.position = camPos + camRot * sh;
             tr.rotation = camRot;
-            sparks.Evaluate(sparkT, tr);
+            sparks.Evaluate(SparksOn ? sparkT : -1, tr);
             cam.fieldOfView = fov;
             // 背景の板は画面ぴったりに（大きすぎると、白く光る中心だけが拡大されて映る）
             float bh = 2 * BgDist * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * 1.04f;

@@ -6,6 +6,7 @@ namespace PachiMoji
     /// ドンの瞬間にはじける火花の粒。Evaluate(tau, cam) に「はじけてからの秒数」を渡すと、
     /// その瞬間の姿にそろえる（状態を持たない。同じ tau なら同じ絵）。
     /// 粒は速さの向きに伸びた光の筋で、はじめは長く、勢いが落ちると短い点になって消える。
+    /// 文字の表の面にかぶせず、文字の周り（外側の縁の少し奥）から外へ少しだけ飛び出させる（ユーザーの好み）。
     /// </summary>
     public class PachiSparks
     {
@@ -45,17 +46,18 @@ namespace PachiMoji
                 m.SetColor("_Color", c < 0.7f ? new Color(1f, 0.6f, 0.18f) : new Color(1f, 0.85f, 0.55f));
                 go.GetComponent<MeshRenderer>().sharedMaterial = m;
 
-                // 文字の表の面のあたりから生まれ、中心から外へはじける（カメラは -z 側）
-                var p0 = center + new Vector3((R() - 0.5f) * size.x * 0.8f, (R() - 0.5f) * size.y * 0.7f, -size.z * 0.6f);
-                var outv = new Vector3(p0.x - center.x, p0.y - center.y, 0);
-                if (outv.sqrMagnitude < 1e-6f) outv = Vector3.up;
-                outv = Quaternion.Euler(0, 0, (R() - 0.5f) * 60) * outv.normalized;
-                float sp = w * (2.2f + 4.5f * R() * R());
-                var v = outv * sp + new Vector3(0, w * 0.8f * R(), -w * 1.2f * R());
+                // 文字全体を囲む枠の上（縁の少し内側・奥）から生まれ、外へ飛び出す。手前の文字に隠れて縁から出てくる
+                float a = R() * Mathf.PI * 2;
+                var dir = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0);
+                float k = 0.46f / Mathf.Max(Mathf.Abs(dir.x), Mathf.Abs(dir.y) * size.x / size.y);
+                var p0 = center + new Vector3(dir.x * size.x * k, dir.y * size.x * k, size.z * 0.1f);
+                var outv = Quaternion.Euler(0, 0, (R() - 0.5f) * 50) * dir;
+                float sp = w * (1.0f + 1.8f * R() * R());   // 少しだけ飛び出す
+                var v = outv * sp + new Vector3(0, w * 0.4f * R(), -w * 0.3f * R());
                 s.sparks[i] = new Spark
                 {
                     tr = go.transform, mat = m, p0 = p0, v = v,
-                    life = 0.45f + 0.6f * R(), bright = 7 + 8 * R(), flick = 20 + 30 * R(),
+                    life = 0.5f + 0.6f * R(), bright = 7 + 8 * R(), flick = 20 + 30 * R(),
                 };
                 go.SetActive(false);
             }
