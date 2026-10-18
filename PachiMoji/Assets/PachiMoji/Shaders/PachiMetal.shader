@@ -3,6 +3,7 @@
 // 2) その明るさを、波打つ色の対応表（_Ramp）に通して金・銀・黒などにする
 // 3) 一番明るいところは 1 を超える明るさにして、光のにじみ（ブルーム）を起こす
 // 4) 格上げ：もう1組の色（_RampB／_RainbowB）を持ち、文字の左から _WipeX まで塗り替える
+// 5) 昇格の瞬間：_White で全体を白く飛ばす。_HueShift で虹の色を流す
 Shader "PachiMoji/Metal"
 {
     Properties
@@ -21,6 +22,8 @@ Shader "PachiMoji/Metal"
         _RainbowB ("Rainbow B (0/1)", Float) = 0
         _WipeX ("Wipe X (object)", Float) = -100000
         _WipeGlow ("Wipe Glow", Float) = 0
+        _White ("White Hot", Float) = 0
+        _HueShift ("Hue Shift", Float) = 0
     }
     SubShader
     {
@@ -41,7 +44,7 @@ Shader "PachiMoji/Metal"
                 float4 _Ramp_ST;
                 float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness, _BackFade;
                 float4 _RampB_ST;
-                float _RainbowB, _WipeX, _WipeGlow;
+                float _RainbowB, _WipeX, _WipeGlow, _White, _HueShift;
             CBUFFER_END
 
             struct A { float4 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
@@ -101,7 +104,7 @@ Shader "PachiMoji/Metal"
                 float3 c;
                 if ((useB ? _RainbowB : _Rainbow) > 0.5)
                 {
-                    float hue = frac(i.wp.x * _HueScale + i.wp.y * 0.08);
+                    float hue = frac(i.wp.x * _HueScale + i.wp.y * 0.08 + _HueShift);
                     float3 base = hsv2rgb(hue, 0.9, 1);
                     // 虹も金属：暗いところは沈め、明るいところは白く飛ばす
                     c = base * (0.16 + 1.05 * pow(L, 1.15)) + pow(L, 9) * 1.2;
@@ -111,6 +114,8 @@ Shader "PachiMoji/Metal"
                     c = useB ? SAMPLE_TEXTURE2D(_RampB, sampler_RampB, float2(L, 0.5)).rgb
                              : SAMPLE_TEXTURE2D(_Ramp, sampler_Ramp, float2(L, 0.5)).rgb;
                 }
+                // 白く飛ぶ：色を抜いて、明暗の形だけ残した白熱の白にする
+                c = lerp(c, float3(1.0, 0.97, 0.9) * (0.55 + 1.3 * L), _White);
                 // 塗り替えの境目に光の帯
                 c += float3(1.0, 0.95, 0.8) * exp(-abs(i.ox - _WipeX) * 18) * _WipeGlow;
                 c *= _Brightness;

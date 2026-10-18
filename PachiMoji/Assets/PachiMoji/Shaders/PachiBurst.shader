@@ -15,6 +15,8 @@ Shader "PachiMoji/Burst"
         _Core ("Core Glow", Float) = 1
         _Aberration ("Chromatic Aberration", Float) = 0.012
         _Gain ("Gain", Float) = 1
+        _Rays ("Ray Burst", Float) = 0
+        _RayReach ("Ray Reach", Float) = 2
     }
     SubShader
     {
@@ -29,7 +31,7 @@ Shader "PachiMoji/Burst"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 float4 _Center;
-                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain;
+                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain, _Rays, _RayReach;
             CBUFFER_END
             struct A { float4 pos : POSITION; float2 uv : TEXCOORD0; };
             struct V { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -132,6 +134,17 @@ Shader "PachiMoji/Burst"
                 float3 coreCol = _Mode > 1.5 ? float3(0.7, 0.85, 1.0) : float3(1.0, 0.9, 0.7);
                 if (_Mode > 0.5 && _Mode < 1.5) core *= 0.35;   // 虹は中心を暗めに
                 c += coreCol * (core + streak) * _Core;
+
+                // 光の放射：中心（文字の裏）から吹き出す、虹色がかった細い光の筋。_RayReach まで伸びる
+                if (_Rays > 0)
+                {
+                    float ra = atan2(p.y, p.x) / 6.2831853 + 0.5;
+                    float rn = vnoise(float2(ra * 70, 3.1)) * 0.65 + vnoise(float2(ra * 190, 8.7)) * 0.35;
+                    float ray = pow(saturate(rn * 1.25), 7) * 6 * smoothstep(0.0, 0.08, r) * (1 - smoothstep(_RayReach * 0.7, _RayReach, r));
+                    float3 prism = hsv2rgb(frac(ra * 9 + r * 0.6), 0.55, 1);
+                    c += lerp(float3(1.0, 0.95, 0.85), prism, 0.6) * ray * _Rays;
+                    c += float3(1.0, 0.92, 0.75) * exp(-r * 3.5) * _Rays * 1.2;
+                }
 
                 // 金の火花：放射状のマス目ごとに1つ。外へ流れ、チカチカ点滅する
                 float a = atan2(p.y, p.x) / 6.2831853 + 0.5;

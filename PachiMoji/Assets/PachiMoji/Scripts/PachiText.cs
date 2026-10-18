@@ -115,6 +115,17 @@ namespace PachiMoji
             }
         }
 
+        /// <summary>昇格の瞬間の白飛び（white 0〜1）と、虹の色の流れ（hueShift）</summary>
+        public static void SetHeat(Rig rig, float white, float hueShift)
+        {
+            for (int i = 0; i < rig.mats.Length; i++)
+            {
+                // 黒い溝（2番）は白くしない。字の形が溶けてしまうので
+                rig.mats[i].SetFloat("_White", i == 2 ? 0 : white);
+                rig.mats[i].SetFloat("_HueShift", hueShift);
+            }
+        }
+
         /// <summary>サブメッシュ順：表の面・細い線・黒・外フチ・側面</summary>
         public static Material[] Materials(Finish f)
         {
