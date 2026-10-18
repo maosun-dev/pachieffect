@@ -11,7 +11,7 @@ namespace PachiMoji
     /// 動画の書き出しでも、アプリで再生しても、同じ時刻なら同じ絵になる。
     ///
     /// 流れ（参考動画の調査より）：
-    ///   うなり（赤くにじむ）→ 暗転・無音 → チラ見せ（1文字ずつ超アップ、あいだに暗転、だんだん速く）
+    ///   うなり（赤くにじむ）→ 暗転・無音 → チラ見せ（1文字ずつ、立体を回り込んで映す。あいだに暗転、だんだん速く）
     ///   → 文字の裏から光が吹き出す → 青・白の閃光 → 銀の文字が飛んできてドン
     ///   → 昇格（前ぶれ→白く飛ぶ→一瞬で金に切り替え＋跳ねる）→ 同じく虹へ → 余韻（背景の色が切り替わり続ける）
     /// </summary>
@@ -43,6 +43,8 @@ namespace PachiMoji
         const float BgDist = 60;
         int teaseCount;
         float[] teaseAt, teaseLen;   // チラ見せ1文字ずつの始まりと長さ（だんだん短く＝速くなる）
+        // チラ見せ用に1文字ずつ別に作った立体（となりの文字が映り込んで先に全体が見えないように）
+        GameObject[] teaseObj; Vector3[] teaseC; float[] teaseSize;
         Vector3 camBasePos; Quaternion camBaseRot;
         Quaternion textBaseRot;
         const float BaseFov = 32;
@@ -68,6 +70,20 @@ namespace PachiMoji
                 cur += st.teaseLen[k];
             }
             st.RayStart = cur;
+
+            // チラ見せ用の1文字ずつの立体。ふだんは隠しておく
+            var chars = string.Concat(lines).Replace(" ", "").Replace("　", "");
+            st.teaseObj = new GameObject[st.teaseCount]; st.teaseC = new Vector3[st.teaseCount]; st.teaseSize = new float[st.teaseCount];
+            for (int k = 0; k < st.teaseCount && k < chars.Length; k++)
+            {
+                var one = PachiText.Create(new[] { chars[k].ToString() }, PachiText.Finish.Silver, font);
+                var ob = one.GetComponent<MeshRenderer>().bounds;
+                st.teaseC[k] = ob.center;
+                // 縦長の画面なので、高さと「横幅÷画面の縦横比」の大きい方に合わせる
+                st.teaseSize[k] = Mathf.Max(ob.size.y, ob.size.x / aspect);
+                one.SetActive(false);
+                st.teaseObj[k] = one;
+            }
             var b = go.GetComponent<MeshRenderer>().bounds;
 
             // カメラ
@@ -148,6 +164,7 @@ namespace PachiMoji
             var tr = cam.transform;
             float fov = BaseFov;
             bool textOn = true;
+            int teaseOn = -1;
             float scale = 1;
             Quaternion rot = textBaseRot;
             Vector3 camPos = camBasePos; Quaternion camRot = camBaseRot;
@@ -169,24 +186,27 @@ namespace PachiMoji
             }
             else if (t < FlashStart)
             {
-                // 暗転 → チラ見せ（1文字ずつ超アップ。カメラがゆっくり流れながら寄る）→ 文字の裏から光が吹き出す
+                // 暗転 → チラ見せ（1文字ずつ、立体のまわりを回り込む）→ 文字の裏から光が吹き出す
                 int k = -1; float lt = 0, len = 1;
                 for (int i = 0; i < teaseCount; i++)
                     if (t >= teaseAt[i] && (t < teaseAt[i] + teaseLen[i] || (i == teaseCount - 1 && t >= RayStart)))
                     { k = i; lt = t - teaseAt[i]; len = teaseLen[i]; }
-                if (k < 0) { textOn = false; bgGain = 0; }   // 暗転・無音
+                textOn = false;
+                if (k < 0) { bgGain = 0; }   // 暗転・無音
                 else
                 {
-                    float u = lt / len;                       // 光の放射中は 1 を超えて、そのままゆっくり流れ続ける
-                    float dir = k % 2 == 0 ? 1 : -1;
-                    rot = Quaternion.Euler(4, dir * -10, 0);
-                    text.rotation = rot; text.localScale = Vector3.one;
-                    var c = text.TransformPoint(rig.charCenters[k]);
-                    var off = rot * new Vector3(dir * Mathf.LerpUnclamped(-0.14f, 0.14f, u), Mathf.LerpUnclamped(-0.04f, 0.04f, u), Mathf.LerpUnclamped(-0.74f, -0.62f, u));
-                    camPos = c + off;
-                    camRot = Quaternion.LookRotation(c - camPos + rot * new Vector3(0, 0.02f, 0)) * Quaternion.Euler(0, 0, dir * 4);
-                    fov = 46;
-                    bgMode = 2; bgGain = 0.55f; bgCore = 0.4f; bgBolts = 0.25f;
+                    // 1文字まるごと見える距離から、下からあおって横へ回り込み、立体をなめるように映す
+                    teaseOn = k;
+                    float u = lt / len;                       // 光の放射中は 1 を超えて、そのまま回り続ける
+                    float dir = k % 2 == 0 ? 1 : -1;          // 回る向きを1文字ごとに入れ替える
+                    var c = teaseC[k];
+                    fov = 38;
+                    float d = teaseSize[k] * 0.5f / Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) / 0.9f;   // 画面の約9割に収める
+                    float yaw = dir * Mathf.LerpUnclamped(-38f, 32f, u);
+                    float pitch = -Mathf.LerpUnclamped(20f, 8f, u);                                // 下から見上げる
+                    camPos = c + Quaternion.Euler(pitch, yaw, 0) * new Vector3(0, 0, -d * Mathf.LerpUnclamped(1.1f, 0.9f, u));
+                    camRot = Quaternion.LookRotation(c - camPos) * Quaternion.Euler(0, 0, dir * 3);
+                    bgMode = 2; bgGain = 0.2f; bgCore = 0.8f; bgBolts = 0; bgSparks = 0.5f;   // 暗い青。文字の後ろだけほんのり光る
                     flash = new Color(0, 0, 0, 1 - Clamp01(lt / 0.1f));   // 暗転からすっと出る
                     shake = 0.012f * Decay(t, teaseAt[k], 10);
                     if (t >= RayStart)
@@ -194,7 +214,7 @@ namespace PachiMoji
                         // 光の放射：文字の裏から光の筋が伸び、最後は白く飛ぶ
                         float rp = (t - RayStart) / RayLen;
                         fgRays = 0.25f + rp * 1.0f; fgReach = Mathf.Lerp(0.15f, 2.2f, Mathf.Pow(rp, 0.7f));
-                        bgGain = Mathf.Lerp(0.55f, 1.3f, rp); bgCore = Mathf.Lerp(0.4f, 1.5f, rp);
+                        bgGain = Mathf.Lerp(0.2f, 1.3f, rp); bgCore = Mathf.Lerp(0.8f, 1.5f, rp);
                         float wa = Mathf.SmoothStep(0, 1, (rp - 0.55f) / 0.45f);
                         flash = new Color(1, 1, 1, wa);
                         shake = 0.006f + 0.02f * rp;
@@ -271,6 +291,17 @@ namespace PachiMoji
 
             // 反映
             text.gameObject.SetActive(textOn);
+            for (int i = 0; i < teaseCount; i++) if (teaseObj[i] != null) teaseObj[i].SetActive(i == teaseOn);
+            if (teaseOn >= 0)
+            {
+                // チラ見せの角のキラッは、1つずつ順番に光らせる（全部光りっぱなしだとうるさい）
+                var tg = teaseObj[teaseOn].GetComponent<PachiText.Rig>().glints;
+                for (int i = 0; i < tg.Count; i++)
+                {
+                    float ph = Mathf.Repeat(t * 1.6f - i * 0.37f, 1f);
+                    tg[i].sharedMaterial.SetFloat("_Intensity", 6f * Mathf.Exp(-ph * 10f));
+                }
+            }
             text.rotation = rot;
             text.localScale = Vector3.one * scale;
             PachiText.SetLook(rig, look.Item1, look.Item2, look.Item3, lookGlow);
