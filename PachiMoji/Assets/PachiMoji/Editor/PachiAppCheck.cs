@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
@@ -28,6 +29,16 @@ namespace PachiMoji.EditorTools
 
                 // 再生だけのシーンがあること
                 Expect(File.Exists(Path.Combine(Application.dataPath, "../", PachiBuild.PlayScene)), "シーン " + PachiBuild.PlayScene);
+
+                // iPhone 用の設定（PachiBuild.Configure が当てたもの）
+                Expect(PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.iOS) == PachiBuild.BundleId, "Bundle ID");
+                Expect(PlayerSettings.productName == PachiBuild.AppName, "ホーム画面の名前");
+                Expect(PlayerSettings.iOS.targetDevice == iOSTargetDevice.iPhoneOnly, "iPhone だけ");
+                Expect(PlayerSettings.defaultInterfaceOrientation == UIOrientation.Portrait, "縦向き固定");
+                Expect(EditorBuildSettings.scenes.Length == 1 && EditorBuildSettings.scenes[0].path == PachiBuild.PlayScene, "入れるシーンは Play だけ");
+                foreach (var s in PachiBuild.Shaders) Expect(PachiBuild.AlwaysIncluded(s), "いつも入れるシェーダー: " + s);
+                var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(PachiBuild.IconPath);
+                Expect(icon != null && icon.width == 1024 && icon.height == 1024, "アイコン 1024 四方");
 
                 // 2つの画面比率の絵（iPhone SE の 9:16 と、ノッチのある機種の 9:19.5）
                 string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../captures"));
