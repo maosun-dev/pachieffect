@@ -13,6 +13,8 @@ namespace PachiMoji.EditorTools
     /// 背景が細かく動く場面でブロック状に崩れ、暗転に前の絵の残像が出たため使わない）。
     /// あわせて、0.25 秒ごとのコマを並べた一覧画像も作る。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiMovie.Run で動かす。
+    /// 確認を速くするため、環境変数で書き出す範囲と画質を絞れる（movie.sh の引数から渡す）：
+    ///   PACHI_FROM / PACHI_TO＝書き出す秒の範囲、PACHI_QUICK=1＝2倍で描いて縮めるのをやめる（細部は粗くなる）
     /// </summary>
     public static class PachiMovie
     {
@@ -25,7 +27,11 @@ namespace PachiMoji.EditorTools
             {
                 string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../captures"));
                 Directory.CreateDirectory(outDir);
-                Render(new[] { "定時", "退社" }, 720, 1280, Path.Combine(outDir, "frames"), Path.Combine(outDir, "movie_teiji_sheet.png"));
+                float from = EnvFloat("PACHI_FROM", 0), to = EnvFloat("PACHI_TO", -1);
+                bool quick = Environment.GetEnvironmentVariable("PACHI_QUICK") == "1";
+                bool part = from > 0 || to >= 0;
+                Render(new[] { "定時", "退社" }, 720, 1280, Path.Combine(outDir, "frames"),
+                    Path.Combine(outDir, part ? "movie_part_sheet.png" : "movie_teiji_sheet.png"), from, to, quick);
             }
             catch (Exception e)
             {
@@ -35,20 +41,27 @@ namespace PachiMoji.EditorTools
             if (Application.isBatchMode) EditorApplication.Exit(code);
         }
 
-        static void Render(string[] lines, int w, int h, string frameDir, string sheetPath)
+        static float EnvFloat(string name, float def) =>
+            float.TryParse(Environment.GetEnvironmentVariable(name), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : def;
+
+        static void Render(string[] lines, int w, int h, string frameDir, string sheetPath, float from, float to, bool quick)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var st = PachiStage.Build(lines, (float)w / h);
 
             // 2倍の大きさで描いて縮める（ギザギザを消す）
-            var big = new RenderTexture(w * 2, h * 2, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            int ss = quick ? 1 : 2;
+            var big = new RenderTexture(w * ss, h * ss, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             var small = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             var frame = new Texture2D(w, h, TextureFormat.RGBA32, false);
             st.cam.targetTexture = big;
 
-            int total = Mathf.CeilToInt(st.End * Fps);
-            // 一覧画像：0.25 秒ごと
-            int every = Fps / 4;
+            int first = Mathf.Max(0, Mathf.FloorToInt(from * Fps));
+            int last = Mathf.CeilToInt((to >= 0 ? Mathf.Min(to, st.End) : st.End) * Fps);
+            int total = last - first;
+            // 一覧画像：全体なら 0.25 秒ごと、範囲を絞ったときは 0.1 秒ごと
+            int every = from > 0 || to >= 0 ? 3 : Fps / 4;
             int thumbs = total / every + 1, cols = 8, tw = 180, th = Mathf.RoundToInt(180f * h / w);
             int rows = (thumbs + cols - 1) / cols;
             var sheet = new Texture2D(cols * tw, rows * th, TextureFormat.RGBA32, false);
@@ -60,7 +73,7 @@ namespace PachiMoji.EditorTools
             {
                 for (int f = 0; f < total; f++)
                 {
-                    float t = f / (float)Fps;
+                    float t = (first + f) / (float)Fps;
                     st.Evaluate(t);
                     st.cam.Render();
                     Graphics.Blit(big, small);
@@ -84,7 +97,7 @@ namespace PachiMoji.EditorTools
             File.WriteAllBytes(sheetPath, sheet.EncodeToPNG());
             st.cam.targetTexture = null;
             big.Release(); small.Release();
-            Debug.Log($"[PachiMovie] saved frames={total} seconds={st.End:F2}");
+            Debug.Log($"[PachiMovie] saved frames={total} from={first / (float)Fps:F2} seconds={st.End:F2} quick={quick}");
         }
 
         // 縮小（近い画素を拾うだけの簡単なもの）

@@ -48,7 +48,7 @@ namespace PachiMoji
         public Transform text;
         public PachiText.Rig rig;
         Material bgMat, flashMat, raysMat;
-        PachiShards shards;   // ドンで飛び散る破片
+        PachiSparks sparks;   // ドンではじける火花
         Transform bg; float aspect;
         const float BgDist = 60;
         int teaseCount;
@@ -103,11 +103,8 @@ namespace PachiMoji
             }
             var b = go.GetComponent<MeshRenderer>().bounds;
 
-            // ドンで飛び散る破片：銀の表の面・銀のフチ・白く焼けたもの
-            var sm = PachiText.Materials(PachiText.Finish.Silver);
-            var hot = PachiText.Materials(PachiText.Finish.Silver)[0];
-            hot.SetFloat("_White", 0.75f);
-            st.shards = PachiShards.Build(b.center, b.size, new[] { sm[0], hot, sm[3], hot }, 72, StableHash(string.Concat(lines)) + 1);
+            // ドンではじける火花
+            st.sparks = PachiSparks.Build(b.center, b.size, 140, StableHash(string.Concat(lines)) + 1);
 
             // カメラ
             var camGo = new GameObject("Camera");
@@ -246,7 +243,7 @@ namespace PachiMoji
             // ヒットストップのあいだは背景の動きも止める。動き出したら止まっていた分だけ遅らせる
             bool stop = t >= Impact && t < ImpactEnd;
             float bt = t < Impact ? t : stop ? Impact : t - HitStop;
-            float shardT = t < Impact ? -1 : stop ? 0.02f : t - ImpactEnd + 0.02f;
+            float sparkT = t < Impact ? -1 : stop ? 0.02f : t - ImpactEnd + 0.02f;
 
             if (t < Rumble)
             {
@@ -433,12 +430,11 @@ namespace PachiMoji
                 g.sharedMaterial.SetFloat("_Intensity", (i == 0 ? 7f : 4f) * tw);
             }
 
-            shards.Evaluate(shardT);
-
             // 揺れ（時刻から決まる乱数で）
             var sh = new Vector3(Hash(t * 31.7f) - 0.5f, Hash(t * 17.3f + 4) - 0.5f, 0) * 2 * shake;
             tr.position = camPos + camRot * sh;
             tr.rotation = camRot;
+            sparks.Evaluate(sparkT, tr);
             cam.fieldOfView = fov;
             // 背景の板は画面ぴったりに（大きすぎると、白く光る中心だけが拡大されて映る）
             float bh = 2 * BgDist * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * 1.04f;
