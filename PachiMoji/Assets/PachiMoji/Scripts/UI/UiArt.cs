@@ -148,6 +148,29 @@ namespace PachiMoji
             return ToSprite(px, W, H, new Vector4(16, 0, 16, 0));
         });
 
+        /// <summary>光の色の見本：芯が白く、まわりに色がにじむ小さな光の点</summary>
+        public static Sprite Dot(Color c) => Cached("dot" + ColorUtility.ToHtmlStringRGB(c), () => GlowDot(_ => c));
+
+        /// <summary>虹の光の点（まわりの色相が一周する）</summary>
+        public static Sprite RainbowDot() => Cached("dotRainbow", () =>
+            GlowDot(a => Color.HSVToRGB(Mathf.Repeat(a / (2 * Mathf.PI), 1f), 0.6f, 1f)));
+
+        static Sprite GlowDot(System.Func<float, Color> colorAt)
+        {
+            const int N = 64;
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float nx = (x + 0.5f) / N * 2 - 1, ny = (y + 0.5f) / N * 2 - 1;
+                    float r = Mathf.Sqrt(nx * nx + ny * ny);
+                    var c = Color.Lerp(Color.white, colorAt(Mathf.Atan2(ny, nx)), Mathf.Clamp01(r / 0.35f));
+                    c.a = Mathf.Clamp01(1.2f * Mathf.Exp(-r * r * 5) - 0.05f) * Mathf.Clamp01((1 - r) * 8);
+                    px[y * N + x] = c;
+                }
+            return ToSprite(px, N, N, Vector4.zero);
+        }
+
         /// <summary>下から上へ、黒が消えていくぼかし（明るい絵の上で文字を読めるようにする）</summary>
         public static Sprite Scrim() => Cached("scrim", () =>
         {

@@ -214,13 +214,13 @@ namespace PachiMoji
 
         // ───────── 組み立ての小道具 ─────────
 
-        static void Show(CanvasGroup g, bool on)
+        internal static void Show(CanvasGroup g, bool on)
         {
             g.alpha = on ? 1 : 0;
             g.interactable = g.blocksRaycasts = on;
         }
 
-        static RectTransform Rect(Transform parent, string name)
+        internal static RectTransform Rect(Transform parent, string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
             var rt = (RectTransform)go.transform;
@@ -245,7 +245,7 @@ namespace PachiMoji
             rt.offsetMax = new Vector2(0, -top);
         }
 
-        static void Place(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)
+        internal static void Place(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)
         {
             rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = new Vector2(0.5f, 0.5f);
@@ -253,7 +253,7 @@ namespace PachiMoji
             rt.sizeDelta = size;
         }
 
-        static TMP_Text Label(RectTransform parent, string s, TMP_FontAsset font, float size, Color c)
+        internal static TMP_Text Label(RectTransform parent, string s, TMP_FontAsset font, float size, Color c)
         {
             var rt = Rect(parent, "Label");
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
@@ -267,7 +267,7 @@ namespace PachiMoji
         }
 
         // 銀の板の文字ボタン。押せないときも板は薄めず、文字の色（灰）で伝える
-        static Button PlateButton(RectTransform parent, string text, Vector2 anchor, Vector2 pos, Vector2 size,
+        internal static Button PlateButton(RectTransform parent, string text, Vector2 anchor, Vector2 pos, Vector2 size,
             TMP_FontAsset font, float fontSize, Color textColor)
         {
             var rt = Rect(parent, text);
@@ -308,7 +308,7 @@ namespace PachiMoji
             return f;
         }
 
-        static void SetLayer(GameObject go, int layer)
+        internal static void SetLayer(GameObject go, int layer)
         {
             foreach (var t in go.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer;
         }

@@ -11,17 +11,20 @@ namespace PachiMoji
     public class PachiApp : MonoBehaviour
     {
         const string WordsKey1 = "words.1", WordsKey2 = "words.2";
-        const float SinkTime = 0.3f;   // 入力の板と PUSH が沈んで消えるまで（秒）
+        const float SinkTime = 0.3f;    // 入力の板と PUSH が沈んで消えるまで（秒）
+        const float SlideTime = 0.25f;  // 設定画面がせり上がるまで（秒）
 
         EffectSettings settings;
         StageScreen stage;
         string builtKey;
         InputCheck check;
         MainScreen ui;
+        SettingsScreen settingsUi;
         Camera uiCam;
         AppState state;
-        float t, idleT, sink;
-        int sinkDir;   // +1 沈む、-1 戻る、0 止まっている
+        float t, idleT, sink, slide = 1;
+        int sinkDir;    // +1 沈む、-1 戻る、0 止まっている
+        int slideDir;   // -1 せり上がる、+1 下がる、0 止まっている
 
         Vector2 ScreenPx => new Vector2(Screen.width, Screen.height);
 
@@ -32,7 +35,10 @@ namespace PachiMoji
 
             uiCam = MainScreen.CreateUiCamera();
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            ui = MainScreen.Build(MainScreen.CreateCanvas(uiCam), Screen.safeArea, ScreenPx);
+            var root = MainScreen.CreateCanvas(uiCam);
+            ui = MainScreen.Build(root, Screen.safeArea, ScreenPx);
+            settingsUi = SettingsScreen.Build(root, Screen.safeArea, ScreenPx, settings, s => s.Save());
+            settingsUi.Back.onClick.AddListener(CloseSettings);
             stage = new StageScreen(ui, uiCam);
             ui.Line1.text = PlayerPrefs.GetString(WordsKey1, "定時");
             ui.Line2.text = PlayerPrefs.GetString(WordsKey2, "退社");
@@ -60,6 +66,13 @@ namespace PachiMoji
                 ui.SetDeckSink(sink * sink);   // 沈み始めはゆっくり、だんだん速く
                 if (sinkDir > 0 && sink >= 1) { sinkDir = 0; StartPlay(); }
                 else if (sinkDir < 0 && sink <= 0) sinkDir = 0;
+            }
+            if (slideDir != 0)
+            {
+                slide = Mathf.Clamp01(slide + slideDir * dt / SlideTime);
+                settingsUi.SetSlide(Smooth(slide));   // 1＝下に隠れている、0＝全部見えている
+                if (slideDir > 0 && slide >= 1) { slideDir = 0; settingsUi.Show(false); }
+                else if (slideDir < 0 && slide <= 0) slideDir = 0;
             }
             ui.Pulse(Time.unscaledTime);
 
@@ -137,8 +150,27 @@ namespace PachiMoji
             sinkDir = -1;
         }
 
-        // 設定画面は Task 8 でつなぐ
-        void OpenSettings() { }
+        static float Smooth(float x) => x * x * (3 - 2 * x);
+
+        void OpenSettings()
+        {
+            if (state != AppState.Idle || sinkDir != 0) return;
+            EventSystem.current?.SetSelectedGameObject(null);
+            SetState(AppState.Settings);
+            stage.SetVisible(false);   // 設定画面は全面を覆うので、裏の舞台は描かない
+            settingsUi.SetSlide(1);   // 下に隠れた位置から（開いた最初のコマで全部見えないように）
+            settingsUi.Show(true);
+            slideDir = -1;
+        }
+
+        // 閉じたら、演出に関わる設定が変わっていれば舞台を組み立て直し、書体が変わっていれば入力を確かめ直す（Rebuild が両方する）
+        void CloseSettings()
+        {
+            if (state != AppState.Settings) return;
+            slideDir = 1;
+            SetState(AppState.Idle);
+            Rebuild();
+        }
 
         void SetState(AppState s)
         {

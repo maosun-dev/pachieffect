@@ -87,6 +87,11 @@ namespace PachiMoji.EditorTools
                     ShotMain(w, h, Path.Combine(outDir, $"main_{tag}_notice.png"), "定時", "退社♨", AppState.Idle);
                     ShotMain(w, h, Path.Combine(outDir, $"main_{tag}_end.png"), "定時", "退社", AppState.Finished);
                 }
+
+                // 設定画面：既定と、全部を変えたとき
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_changed.png"), new EffectSettings
+                    { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho, From = Tier.Gold, To = Tier.Rainbow });
             }
             catch (Exception e)
             {
@@ -187,6 +192,20 @@ namespace PachiMoji.EditorTools
             }
             RenderUi(rt, path, uiCam);
             stage.Dispose();
+        }
+
+        static void ShotSettings(int w, int h, string path, EffectSettings settings)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            float pt = w / UiTheme.ReferenceSize.x;
+            var safe = new Rect(0, 34 * pt, w, h - (47 + 34) * pt);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = MainScreen.CreateUiCamera();
+            uiCam.targetTexture = rt;
+            var screen = SettingsScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h), settings, _ => { });
+            screen.Show(true);
+            screen.SetSlide(0);
+            RenderUi(rt, path, uiCam);
         }
 
         // 画面のカメラで板へ描いて保存する
