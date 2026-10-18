@@ -25,7 +25,18 @@ GitHub の Linux 機で Unity を動かすには、あなたの Unity の無料�
 | `UNITY_EMAIL` | Unity アカウントのメールアドレス |
 | `UNITY_PASSWORD` | Unity アカウントのパスワード |
 
-うまくいかないときの心当たり：Unity アカウントの2段階認証に「認証アプリ」を使っていると、組み立て機からログインできないことがあります。
+うまくいかないときの心当たり：
+- **Unity アカウントを「Google でサインイン」で作った**場合、パスワードがありません。組み立て機は Google のボタンを押せないので、https://id.unity.com/password/new でパスワードを作ってから `UNITY_PASSWORD` に入れます（2026-10-18 に実際にこれで止まった。ログインに失敗し続けると Unity から「Temporary lock out」のメールが来て、10分ロックされる）
+- **Unity Hub にライセンスが表示されていても、`Unity_lic.ulf` が無い**ことがあります。Hub の「ライセンスを加える」→「無料の個人用ライセンスを取得」を押し直すと作られます
+- Unity アカウントの2段階認証に「認証アプリ」を使っていると、組み立て機からログインできないことがあります
+
+ターミナルから入れる方法（ファイルを開かずに済む）：
+
+```powershell
+Get-Content -Raw "C:\ProgramData\Unity\Unity_lic.ulf" | & "C:\Program Files\GitHub CLI\gh.exe" secret set UNITY_LICENSE -R maosun-dev/pachieffect
+& "C:\Program Files\GitHub CLI\gh.exe" secret set UNITY_EMAIL -R maosun-dev/pachieffect
+& "C:\Program Files\GitHub CLI\gh.exe" secret set UNITY_PASSWORD -R maosun-dev/pachieffect
+```
 
 ## 2. Apple の鍵を GitHub に渡す
 
