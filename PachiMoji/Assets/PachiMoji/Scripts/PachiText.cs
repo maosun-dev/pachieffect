@@ -26,6 +26,7 @@ namespace PachiMoji
             public List<Renderer> glints = new List<Renderer>();
             public List<Vector3> charCenters = new List<Vector3>();   // 文字の中心（ローカル座標）
             public float minX, maxX;                                  // 文字全体の左右の端（ローカル座標）
+            public Mesh mesh;                                         // 作った立体（片付けるときに消す）
         }
 
         public static GameObject Create(string[] lines, Finish finish, string fontName = "ReggaeOne", PachiTextBuilder.Style style = null)
@@ -43,6 +44,7 @@ namespace PachiMoji
             mr.sharedMaterials = Materials(finish);
             var rig = go.AddComponent<Rig>();
             rig.mats = mr.sharedMaterials;
+            rig.mesh = mesh;
             foreach (var c in centers) rig.charCenters.Add(new Vector3(c.x, c.y, 0) * 0.001f);
             rig.minX = mesh.bounds.min.x; rig.maxX = mesh.bounds.max.x;
 

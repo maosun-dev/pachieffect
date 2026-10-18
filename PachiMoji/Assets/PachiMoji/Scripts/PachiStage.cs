@@ -66,6 +66,7 @@ namespace PachiMoji
         int[] teaseShot;             // 1文字ずつのカメラの動き方（TeaseShot の番号）。言葉ごとに並びが変わる
         Vector3 camBasePos; Quaternion camBaseRot;
         Quaternion textBaseRot;
+        GameObject volumeGo; VolumeProfile profile;   // 片付けるときに消す
         const float BaseFov = 32;
 
         /// <param name="settings">演出の好み。null なら既定（銀→虹・火花あり・青白の光・Reggae One）</param>
@@ -169,6 +170,7 @@ namespace PachiMoji
 
             // 光のにじみ（ブルーム）
             var vol = new GameObject("Volume").AddComponent<Volume>();
+            st.volumeGo = vol.gameObject;
             vol.isGlobal = true;
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
             var bloom = profile.Add<Bloom>(true);
@@ -177,7 +179,86 @@ namespace PachiMoji
             bloom.scatter.Override(0.65f);
             profile.Add<Tonemapping>(true).mode.Override(TonemappingMode.None);
             vol.sharedProfile = profile;
+            st.profile = profile;
             return st;
+        }
+
+        /// <summary>
+        /// 作ったものを全部消す（言葉を打ち直すたびに組み立て直すので、残すとだんだん重くなる）。
+        /// Quad の共有メッシュと PachiRamps の色表は、ほかの舞台も使うので消さない。
+        /// </summary>
+        public void Dispose()
+        {
+            var roots = new List<GameObject> { text != null ? text.gameObject : null, cam != null ? cam.gameObject : null, volumeGo, sparks?.Root };
+            if (teaseObj != null) roots.AddRange(teaseObj);
+            var mats = new HashSet<Material>();
+            var meshes = new HashSet<Mesh>();
+            foreach (var r in roots)
+            {
+                if (r == null) continue;
+                foreach (var rend in r.GetComponentsInChildren<Renderer>(true))
+                    foreach (var m in rend.sharedMaterials) if (m != null) mats.Add(m);
+                foreach (var rg in r.GetComponentsInChildren<PachiText.Rig>(true))
+                    if (rg.mesh != null) meshes.Add(rg.mesh);
+            }
+            foreach (var r in roots) Kill(r);
+            foreach (var m in mats) Kill(m);
+            foreach (var m in meshes) Kill(m);
+            if (profile != null)
+            {
+                foreach (var c in profile.components) Kill(c);
+                Kill(profile);
+            }
+            text = null; cam = null; volumeGo = null; profile = null; teaseObj = null; sparks = null;
+        }
+
+        // 再生中は Destroy、エディタの裏起動（再生していない）では DestroyImmediate
+        static void Kill(Object o)
+        {
+            if (o == null) return;
+            if (Application.isPlaying) Object.Destroy(o);
+            else Object.DestroyImmediate(o);
+        }
+
+        /// <summary>入力を待っているあいだの姿：銀の文字が暗い青の前でゆっくり揺れている</summary>
+        public void Idle(float t)
+        {
+            text.gameObject.SetActive(true);
+            for (int i = 0; i < teaseCount; i++) if (teaseObj[i] != null) teaseObj[i].SetActive(false);
+            text.rotation = textBaseRot * Quaternion.Euler(Mathf.Sin(t * 0.45f) * 1.5f, Mathf.Sin(t * 0.7f) * 6, 0);
+            text.localScale = Vector3.one;
+            PachiText.SetLook(rig, PachiText.Finish.Silver, PachiText.Finish.Silver, 0, 1.5f);
+            PachiText.SetHeat(rig, 0, 0, 0);
+            for (int i = 0; i < rig.glints.Count; i++)
+            {
+                // 角のキラッは、ひとつずつ順番に
+                var g = rig.glints[i];
+                g.enabled = true;
+                float ph = Mathf.Repeat(t * 0.5f - i * 0.37f, 1f);
+                g.sharedMaterial.SetFloat("_Intensity", 6f * Mathf.Exp(-ph * 10f));
+            }
+            var tr = cam.transform;
+            tr.position = camBasePos + Vector3.up * (Mathf.Sin(t * 0.9f) * 0.01f);
+            tr.rotation = camBaseRot;
+            cam.fieldOfView = BaseFov;
+            float bh = 2 * BgDist * Mathf.Tan(BaseFov * 0.5f * Mathf.Deg2Rad) * 1.04f;
+            bg.localScale = new Vector3(bh * aspect, bh, 1);
+            sparks.Evaluate(-1, tr);
+
+            bgMat.SetFloat("_T", t);
+            bgMat.SetFloat("_Mode", 2);
+            bgMat.SetFloat("_Gain", 0.22f);
+            bgMat.SetFloat("_Core", 0.8f);
+            bgMat.SetFloat("_Bolts", 0);
+            bgMat.SetFloat("_Sparks", 0.3f);
+            bgMat.SetFloat("_Rays", 0);
+            bgMat.SetFloat("_RayReach", 2);
+            raysMat.SetFloat("_Rays", 0);
+            raysMat.SetFloat("_Slash", 0);
+            raysMat.SetFloat("_PFlash", 0);
+            raysMat.SetFloat("_PDot", 0);
+            raysMat.SetFloat("_PArc", 0);
+            flashMat.SetColor("_Color", new Color(0, 0, 0, 0));
         }
 
         static PachiText.Finish FinishOf(Tier t) =>

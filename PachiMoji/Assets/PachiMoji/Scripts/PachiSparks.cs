@@ -18,6 +18,7 @@ namespace PachiMoji
         }
 
         Spark[] sparks;
+        public GameObject Root { get; private set; }   // 粒をまとめた親（片付けるときに消す）
         const float Drag = 4f;       // 空気の抵抗：はじめは速く、すぐに勢いが落ちる
         float gravity, width;
 
@@ -33,6 +34,7 @@ namespace PachiMoji
             s.width = w * 0.024f;
             s.sparks = new Spark[count];
             var root = new GameObject("Sparks").transform;
+            s.Root = root.gameObject;
             var shader = Shader.Find("PachiMoji/Spark");
             for (int i = 0; i < count; i++)
             {

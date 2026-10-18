@@ -56,6 +56,28 @@ namespace PachiMoji.EditorTools
                     new EffectSettings { Light = LightColor.Gold, Size = LightSize.Large }, 0.55f);
                 Shot(720, 1280, Path.Combine(outDir, "puchun_rainbow_small.png"),
                     new EffectSettings { Light = LightColor.Rainbow, Size = LightSize.Small }, 0.55f);
+
+                // 言葉を何度も打ち直しても、古い舞台（立体・材質・カメラ）が残らない
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                int go0 = CountSceneObjects(), mat0 = Count<Material>(), mesh0 = Count<Mesh>();
+                for (int i = 0; i < 10; i++)
+                {
+                    var e = EffectCatalog.Get("oudou").Create();
+                    e.Build(new[] { "定時" + i, "退社" }, 0.5f, new EffectSettings());
+                    e.Evaluate(9f);
+                    e.Idle(1f);
+                    e.Dispose();
+                }
+                int go1 = CountSceneObjects(), mat1 = Count<Material>(), mesh1 = Count<Mesh>();
+                Debug.Log($"[PachiAppCheck] 組み立て直しの前後 物 {go0}→{go1} 材質 {mat0}→{mat1} メッシュ {mesh0}→{mesh1}");
+                Expect(go1 == go0 && mat1 == mat0 && mesh1 == mesh0, "組み立て直しても物が残らない");
+                Expect(EffectCatalog.Get("知らない").Id == "oudou", "知らない ID は王道昇格");
+                Expect(EffectCatalog.All[0].RequiredProduct == null, "王道昇格は無料");
+
+                // 12文字（6文字×2行）がノッチのある機種の比率でも画面に収まる
+                var twelve = new[] { "脳汁ドバドバ", "激アツ確定だ" };
+                ShotEffect(720, 1560, Path.Combine(outDir, "fit_12_end.png"), twelve, e => e.Evaluate(e.Duration - 0.5f));
+                ShotEffect(720, 1560, Path.Combine(outDir, "fit_12_idle.png"), twelve, e => e.Idle(1f));
             }
             catch (Exception e)
             {
@@ -65,6 +87,46 @@ namespace PachiMoji.EditorTools
             if (failed == 0) Debug.Log("[PachiAppCheck] OK");
             else Debug.LogError($"[PachiAppCheck] NG {failed} 件");
             if (Application.isBatchMode) EditorApplication.Exit(failed == 0 ? 0 : 1);
+        }
+
+        static int Count<T>() where T : UnityEngine.Object => Resources.FindObjectsOfTypeAll<T>().Length;
+
+        static int CountSceneObjects()
+        {
+            int n = 0;
+            foreach (var root in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
+                n += root.GetComponentsInChildren<Transform>(true).Length;
+            return n;
+        }
+
+        // 演出の部品で1枚描く（pose で姿を決める）
+        static void ShotEffect(int w, int h, string path, string[] lines, Action<IPachiEffect> pose)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var e = EffectCatalog.Get("oudou").Create();
+            e.Build(lines, (float)w / h, new EffectSettings());
+            pose(e);
+            Save(e.Camera, w, h, path);
+            e.Dispose();
+        }
+
+        static void Save(Camera cam, int w, int h, string path)
+        {
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            cam.targetTexture = rt;
+            cam.Render();
+            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            cam.targetTexture = null;
+            rt.Release();
+            UnityEngine.Object.DestroyImmediate(rt);
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(tex);
+            Debug.Log("[PachiAppCheck] 書き出し " + path);
         }
 
         static void Expect(bool ok, string what)
@@ -80,19 +142,7 @@ namespace PachiMoji.EditorTools
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var st = PachiStage.Build(PachiPlayer.Words, (float)w / h, settings);
             st.Evaluate(t >= 0 ? t : st.End - 0.5f);
-            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-            st.cam.targetTexture = rt;
-            st.cam.Render();
-            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
-            var prev = RenderTexture.active;
-            RenderTexture.active = rt;
-            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
-            tex.Apply();
-            RenderTexture.active = prev;
-            st.cam.targetTexture = null;
-            rt.Release();
-            File.WriteAllBytes(path, tex.EncodeToPNG());
-            Debug.Log("[PachiAppCheck] 書き出し " + path);
+            Save(st.cam, w, h, path);
         }
     }
 }
