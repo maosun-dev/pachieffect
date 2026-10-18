@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>パチ演出 試作</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --urushi: #2a070c;      /* 漆の板 */
+    --urushi-deep: #120306;
+    --beni: #b3121f;        /* 紅 */
+    --kin: #e9b949;         /* 金箔 */
+    --kin-dark: #7d4f0e;
+    --gin: #dfe3ea;         /* 銀 */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background:
+      radial-gradient(120% 60% at 50% 0%, #4a0d14 0%, transparent 60%),
+      linear-gradient(180deg, var(--urushi) 0%, var(--urushi-deep) 100%);
+    color: var(--gin);
+    font-family: "Zen Kaku Gothic New", system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+  .cab {
+    min-height: 100svh;
+    display: grid;
+    grid-template-rows: auto auto;
+    justify-items: center;
+    align-content: center;
+    gap: 14px;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  /* 液晶まわりの金属枠 */
+  .stage-wrap {
+    height: min(calc(100svh - 220px), calc((100vw - 32px) * 16 / 9));
+    aspect-ratio: 9 / 16;
+    padding: 8px;
+    border-radius: 26px;
+    background: linear-gradient(160deg, #f6e3a6 0%, #9a6a1c 22%, #f3d27a 45%, #5c3a08 70%, #e3b95a 100%);
+    box-shadow: 0 0 0 2px #1a0204, 0 18px 40px rgba(0, 0, 0, .7);
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 19px;
+    background: #000;
+  }
+  .panel {
+    width: 100%;
+    max-width: 460px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 16px;
+    align-items: center;
+  }
+  .fields { display: grid; gap: 10px; min-width: 0; }
+  .word label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #d9a9a0;
+    margin: 0 0 4px 2px;
+  }
+  .word input {
+    width: 100%;
+    font: 400 20px/1.2 "Dela Gothic One", sans-serif;
+    color: #fff6dc;
+    background: #0d0204;
+    border: 1px solid var(--kin-dark);
+    border-radius: 10px;
+    padding: 9px 12px;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, .8);
+  }
+  .word input:focus-visible { outline: 2px solid var(--kin); outline-offset: 2px; }
+  .opts { display: flex; gap: 14px; flex-wrap: wrap; }
+  fieldset { border: 0; margin: 0; padding: 0; display: flex; align-items: center; gap: 6px; }
+  legend { float: left; font-size: 12px; font-weight: 700; color: #d9a9a0; margin-right: 4px; }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip span {
+    display: inline-block;
+    min-width: 44px;
+    text-align: center;
+    font: 400 14px/1 "Dela Gothic One", sans-serif;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: #a98b86;
+    background: #1a0407;
+    border: 1px solid #4a1016;
+    cursor: pointer;
+  }
+  .chip input:checked + span {
+    color: #2a1600;
+    background: linear-gradient(180deg, #fff3c4, #e9b949 55%, #a8721a);
+    border-color: #ffe9a0;
+  }
+  .chip input.rainbow:checked + span {
+    color: #fff;
+    background: linear-gradient(90deg, #ff2d55, #ff9500, #ffd60a, #34c759, #0a84ff, #bf5af2);
+    border-color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  }
+  .chip input:focus-visible + span { outline: 2px solid var(--kin); outline-offset: 2px; }
+
+  /* 実機風 PUSH ボタン：銀の輪＋赤いドーム */
+  .push {
+    position: relative;
+    width: 104px;
+    height: 104px;
+    border-radius: 50%;
+    border: 0;
+    padding: 9px;
+    cursor: pointer;
+    background: conic-gradient(from 210deg, #ffffff, #8b929c, #f4f6f8, #5d636c, #e6e9ee, #9aa1aa, #ffffff);
+    box-shadow: 0 6px 0 #3a0a10, 0 12px 26px rgba(0, 0, 0, .7);
+    transition: transform .06s, box-shadow .06s;
+  }
+  .push span {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 28%, #fff 0 5%, #ff9a9a 11%, #e8101f 36%, #7a0008 78%, #380004);
+    color: #fff;
+    font: 400 21px "Dela Gothic One", sans-serif;
+    letter-spacing: .03em;
+    text-shadow: 0 2px 0 #5a0008, 0 0 12px rgba(255, 255, 255, .45);
+    box-shadow: inset 0 -7px 12px rgba(0, 0, 0, .5), inset 0 4px 8px rgba(255, 255, 255, .35);
+  }
+  .push::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    box-shadow: 0 0 22px 6px rgba(255, 40, 60, .55);
+    opacity: 0;
+    animation: halo 1.3s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .push:active { transform: translateY(4px); box-shadow: 0 2px 0 #3a0a10, 0 6px 14px rgba(0, 0, 0, .7); }
+  .push:disabled { cursor: default; }
+  .push:disabled span { filter: grayscale(.8) brightness(.55); }
+  .push:disabled::after { animation: none; opacity: 0; }
+  .push:focus-visible { outline: 3px solid var(--kin); outline-offset: 5px; }
+  @keyframes halo { 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .push::after { animation: none; } }
+</style>
+</head>
+<body>
+<main class="cab">
+  <div class="stage-wrap"><canvas id="stage" aria-label="演出の画面"></canvas></div>
+  <form class="panel" id="panel" onsubmit="return false">
+    <div class="fields">
+      <div class="word">
+        <label for="word">演出にする言葉</label>
+        <input id="word" maxlength="10" value="定時退社" autocomplete="off" enterkeyhint="done">
+      </div>
+      <div class="opts">
+        <fieldset>
+          <legend>溜め</legend>
+          <label class="chip"><input type="radio" name="tame" value="1.6" checked><span>短い</span></label>
+          <label class="chip"><input type="radio" name="tame" value="3.6"><span>長い</span></label>
+        </fieldset>
+        <fieldset>
+          <legend>仕上げ</legend>
+          <label class="chip"><input type="radio" name="finish" value="gold"><span>金</span></label>
+          <label class="chip"><input type="radio" name="finish" value="rainbow" class="rainbow" checked><span>虹</span></label>
+        </fieldset>
+      </div>
+    </div>
+    <button class="push" id="push" type="button" aria-label="演出を始める"><span>PUSH</span></button>
+  </form>
+</main>
+
+<script>
+// ───────── 基本設定 ─────────
+const W = 720, H = 1280;            // 画面の中の座標（縦長 9:16）
+const CX = W / 2, CY = H * 0.46;    // 文字の中心
+const FONT = '"Dela Gothic One", sans-serif';
+const MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.15 : 1;
+const PER = 0.46;                   // チラ見せ1文字の長さ
+const WIPE = 0.5;                   // 色が塗り替わる時間
+
+const cv = document.getElementById('stage');
+const ctx = cv.getContext('2d');
+const wordEl = document.getElementById('word');
+const pushBtn = document.getElementById('push');
+
+function resize() {
+  const r = cv.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(r.width * dpr);
+  cv.height = Math.round(r.height * dpr);
+}
+addEventListener('resize', resize);
+resize();
+
+const rand = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const easeOut = x => 1 - (1 - x) ** 3;
+
+function hex(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
+function mix(a, b, f) { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * f))})`; }
+function hsl2rgb(h, s, l) {
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0) * 255 | 0, f(8) * 255 | 0, f(4) * 255 | 0];
+}
+
+// ───────── 立体文字（プレート）を描く ─────────
+const GOLD_RIM = [[0, '#fff1b0'], [0.5, '#7a4100'], [1, '#ffcf4a']];
+const STYLES = {
+  silver: {
+    ext0: '#4a505a', ext1: '#07080b', glow: 'rgba(140,180,255,0.95)', edge: '#05060a',
+    rim: [[0, '#f4f6f8'], [0.5, '#4f5560'], [1, '#c7ccd3']],
+    face: [[0, '#ffffff'], [0.38, '#dfe3e8'], [0.5, '#737a86'], [0.56, '#f2f4f7'], [0.8, '#b9bfc8'], [1, '#626974']],
+  },
+  gold: {
+    ext0: '#7a4200', ext1: '#160700', glow: 'rgba(255,150,10,0.95)', edge: '#1a0700',
+    rim: GOLD_RIM,
+    face: [[0, '#fffbe6'], [0.3, '#ffe066'], [0.48, '#c47a00'], [0.54, '#fff0a0'], [0.8, '#f0a400'], [1, '#8a4b00']],
+  },
+  rainbow: {
+    ext0: '#4a0c70', ext1: '#0a0018', glow: 'rgba(255,255,255,0.95)', edge: '#0a0012',
+    rim: GOLD_RIM, face: null,
+  },
+};
+const plateCache = new Map();
+
+// 縦長の画面なので、短い言葉も2行に組んで大きく見せる（常勝 → 常／勝、定時退社 → 定時／退社）
+function splitLines(text) {
+  const chars = Array.from(text), n = chars.length;
+  const per = n === 2 ? 1 : n <= 4 ? 2 : n <= 6 ? 3 : n <= 8 ? 4 : 5;
+  const lines = [];
+  for (let i = 0; i < n; i += per) lines.push(chars.slice(i, i + per).join(''));
+  return lines;
+}
+
+function makePlate(lines, style, px) {
+  const key = style + '|' + px + '|' + lines.join('\n');
+  if (plateCache.has(key)) return plateCache.get(key);
+  const S = STYLES[style];
+  const m = document.createElement('canvas').getContext('2d');
+  m.font = `${px}px ${FONT}`;
+  const lw = Math.max(...lines.map(l => m.measureText(l).width));
+  const lh = px * 1.08, pad = px * 0.45, depth = Math.round(px * 0.09);
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(lw + pad * 2);
+  c.height = Math.ceil(lh * lines.length + pad * 2 + depth);
+  const g = c.getContext('2d');
+  const setup = x => { x.font = m.font; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round'; };
+  setup(g);
+  const cx = c.width / 2;
+  const ys = lines.map((_, i) => pad + lh / 2 + i * lh);
+  const each = fn => lines.forEach((l, i) => fn(l, ys[i]));
+
+  // 外側の光
+  g.save();
+  g.shadowColor = S.glow; g.shadowBlur = px * 0.3;
+  g.strokeStyle = S.edge; g.lineWidth = px * 0.2;
+  each((l, y) => g.strokeText(l, cx, y + depth));
+  g.restore();
+  // 厚み（押し出し）
+  g.lineWidth = px * 0.14;
+  for (let k = depth; k >= 1; k--) {
+    g.fillStyle = g.strokeStyle = mix(S.ext0, S.ext1, k / depth);
+    each((l, y) => { g.strokeText(l, cx, y + k); g.fillText(l, cx, y + k); });
+  }
+  // 縁（金属の縁取り）
+  const top = pad, bot = c.height - pad - depth;
+  const rim = g.createLinearGradient(0, top, 0, bot);
+  S.rim.forEach(([o, col]) => rim.addColorStop(o, col));
+  g.strokeStyle = rim; g.lineWidth = px * 0.14;
+  each((l, y) => g.strokeText(l, cx, y));
+  g.strokeStyle = S.edge; g.lineWidth = px * 0.04;
+  each((l, y) => g.strokeText(l, cx, y));
+  // 表の面（別のキャンバスで塗ってから重ねる）
+  const f = document.createElement('canvas');
+  f.width = c.width; f.height = c.height;
+  const fg = f.getContext('2d'); setup(fg);
+  each((l, y) => {
+    if (S.face) {
+      const gr = fg.createLinearGradient(0, y - px * 0.5, 0, y + px * 0.5);
+      S.face.forEach(([o, col]) => gr.addColorStop(o, col));
+      fg.fillStyle = gr;
+    } else {
+      const gr = fg.createLinearGradient(cx - lw / 2, 0, cx + lw / 2, 0);
+      ['#ff2d55', '#ff9500', '#ffe100', '#3ddc5a', '#18c8ff', '#2d6bff', '#c64dff'].forEach((col, i, a) => gr.addColorStop(i / (a.length - 1), col));
+      fg.fillStyle = gr;
+    }
+    fg.fillText(l, cx, y);
+  });
+  fg.globalCompositeOperation = 'source-atop';
+  each((l, y) => {
+    const sh = fg.createLinearGradient(0, y - px * 0.5, 0, y + px * 0.5);
+    if (S.face) {
+      sh.addColorStop(0, 'rgba(255,255,255,0.35)'); sh.addColorStop(0.45, 'rgba(255,255,255,0)');
+      sh.addColorStop(1, 'rgba(0,0,0,0)');
+    } else {
+      sh.addColorStop(0, 'rgba(255,255,255,0.8)'); sh.addColorStop(0.42, 'rgba(255,255,255,0.05)');
+      sh.addColorStop(0.5, 'rgba(0,0,0,0.32)'); sh.addColorStop(0.58, 'rgba(255,255,255,0.3)');
+      sh.addColorStop(1, 'rgba(0,0,0,0.35)');
+    }
+    fg.fillStyle = sh;
+    fg.fillRect(0, y - px * 0.6, c.width, px * 1.2);
+  });
+  g.drawImage(f, 0, 0);
+  // 内側の細いハイライト
+  g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = Math.max(1, px * 0.012);
+  each((l, y) => g.strokeText(l, cx, y));
+
+  const plate = { c, w: c.width, h: c.height, gw: lw, gh: lh * lines.length };
+  plateCache.set(key, plate);
+  return plate;
+}
+
+const fitScale = p => Math.min(1.1, 640 / p.gw, 760 / p.gh);
+// 1〜2文字は大きく描いておく（引き伸ばしてぼやけないように）
+const platePx = text => Array.from(text).length <= 2 ? 440 : 300;
+
+let fontReady = false;
+document.fonts.load(`100px ${FONT}`, '定時退社PUSH').then(() => { fontReady = true; plateCache.clear(); });
+
+// ───────── 音（全部プログラムで作る） ─────────
+let ac = null, master = null, noiseBuf = null;
+function initAudio() {
+  if (ac) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  ac = new AC();
+  const comp = ac.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.ratio.value = 6;
+  master = ac.createGain(); master.gain.value = 0.9;
+  master.connect(comp); comp.connect(ac.destination);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+const A = {
+  gain(dest = master) { const g = ac.createGain(); g.connect(dest); return g; },
+  osc(type, f, t, stop) { const o = ac.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.start(t); o.stop(stop); return o; },
+  noise(t, stop) { const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(t); s.stop(stop); return s; },
+  filt(type, f, q = 1) { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; },
+  env(g, t, a, peak, hold, rel) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, t + a + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + rel);
+  },
+};
+const SFX = {
+  // 低いうなり。最後にブツッと切れて無音になる
+  rumble(t, dur) {
+    const g = A.gain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.9, t + dur);
+    g.gain.setValueAtTime(0, t + dur);
+    const lp = A.filt('lowpass', 90, 4);
+    lp.frequency.setValueAtTime(90, t);
+    lp.frequency.linearRampToValueAtTime(480, t + dur);
+    lp.connect(g);
+    [38, 41.3, 55].forEach(f => A.osc('sawtooth', f, t, t + dur + 0.02).connect(lp));
+    const ng = A.gain();
+    ng.gain.setValueAtTime(0.0001, t);
+    ng.gain.exponentialRampToValueAtTime(0.5, t + dur);
+    ng.gain.setValueAtTime(0, t + dur);
+    const nl = A.filt('lowpass', 260); nl.connect(ng);
+    A.noise(t, t + dur + 0.02).connect(nl);
+  },
+  // チラ見せの「ガッ」
+  hit(t) {
+    const g = A.gain(); A.env(g, t, 0.004, 0.9, 0, 0.3);
+    const o = A.osc('sine', 170, t, t + 0.4);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.18); o.connect(g);
+    const ng = A.gain(); A.env(ng, t, 0.002, 0.5, 0, 0.08);
+    const bp = A.filt('bandpass', 2500, 0.8); bp.connect(ng);
+    A.noise(t, t + 0.12).connect(bp);
+    const mg = A.gain(); A.env(mg, t, 0.003, 0.1, 0, 0.3);
+    [2400, 3170].forEach(f => A.osc('triangle', f, t, t + 0.4).connect(mg));
+  },
+  // 閃光の前の「シュオッ」
+  whoosh(t, d) {
+    const g = A.gain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.7, t + d * 0.9);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    const bp = A.filt('bandpass', 300, 2);
+    bp.frequency.setValueAtTime(300, t);
+    bp.frequency.exponentialRampToValueAtTime(8000, t + d);
+    bp.connect(g);
+    A.noise(t, t + d + 0.02).connect(bp);
+  },
+  // 体に響く「ドン」
+  boom(t, big = 1) {
+    const g = A.gain(); A.env(g, t, 0.005, 1.2 * big, 0.05, 1.6);
+    const sh = ac.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(3 * x); }
+    sh.curve = curve; sh.connect(g);
+    const o = A.osc('sine', 95, t, t + 1.8);
+    o.frequency.exponentialRampToValueAtTime(26, t + 1.4); o.connect(sh);
+    const ng = A.gain(); A.env(ng, t, 0.003, 0.9 * big, 0, 1.3);
+    const lp = A.filt('lowpass', 3000);
+    lp.frequency.setValueAtTime(3000, t); lp.frequency.exponentialRampToValueAtTime(150, t + 1.2);
+    lp.connect(ng); A.noise(t, t + 1.5).connect(lp);
+    const cg = A.gain(); A.env(cg, t, 0.001, 0.6 * big, 0, 0.12);
+    const hp = A.filt('highpass', 3000); hp.connect(cg); A.noise(t, t + 0.2).connect(hp);
+  },
+  // 突き刺す高音「キュイン」：音程が下からせり上がって、細かく震える
+  kyuin(t, base, dur, lv = 0.2) {
+    const out = A.gain(); A.env(out, t, 0.015, lv, dur * 0.45, dur * 0.55);
+    const trem = ac.createGain(); trem.gain.value = 0.75; trem.connect(out);
+    const tl = A.osc('sine', 22, t, t + dur + 0.1), tlg = ac.createGain();
+    tlg.gain.value = 0.25; tl.connect(tlg); tlg.connect(trem.gain);
+    const lp = A.filt('lowpass', 7000); lp.connect(trem);
+    [[1, 'square', 1], [1.5, 'square', 0.55], [2, 'sine', 0.45]].forEach(([mul, type, vol]) => {
+      const f = base * mul;
+      const o = A.osc(type, f * 0.6, t, t + dur + 0.1);
+      o.frequency.exponentialRampToValueAtTime(f, t + 0.1);
+      const v = A.osc('sine', 13, t, t + dur + 0.1), vg = ac.createGain();
+      vg.gain.value = f * 0.012; v.connect(vg); vg.connect(o.frequency);
+      const og = ac.createGain(); og.gain.value = vol; o.connect(og); og.connect(lp);
+    });
+  },
+  // 色が上がるときの駆け上がり
+  arp(t) {
+    [1046.5, 1318.5, 1568, 2093, 2637, 3136, 4186].forEach((f, i) => {
+      const s = t + i * 0.065, g = A.gain(); A.env(g, s, 0.004, 0.12, 0.02, 0.14);
+      A.osc('square', f, s, s + 0.25).connect(g);
+    });
+  },
+  // キラキラした長い余韻
+  shimmer(t, dur) {
+    const out = A.gain(); A.env(out, t, 0.03, 0.5, dur * 0.3, dur * 0.7);
+    const trem = ac.createGain(); trem.gain.value = 0.7; trem.connect(out);
+    const l = A.osc('sine', 8, t, t + dur + 0.1), lg = ac.createGain();
+    lg.gain.value = 0.3; l.connect(lg); lg.connect(trem.gain);
+    [1046.5, 1318.5, 1568, 1975.5, 2637].forEach(f => {
+      const g = ac.createGain(); g.gain.value = 0.07; g.connect(trem);
+      A.osc('sine', f * (1 + rand(-0.003, 0.003)), t, t + dur + 0.1).connect(g);
+    });
+    for (let i = 0; i < 26; i++) {
+      const s = t + rand(dur * 0.7), g = A.gain(); A.env(g, s, 0.003, 0.05, 0, 0.16);
+      A.osc('sine', rand(3000, 6500), s, s + 0.2).connect(g);
+    }
+  },
+};
+
+// ───────── 粒（破片・火花・きらめき） ─────────
+let parts = [];
+const PAL = {
+  silver: ['#ffffff', '#c9d6ff', '#6f8cff', '#e0e6f0'],
+  gold: ['#fff2b0', '#ffcf3a', '#ff8a00', '#c45a00', '#ffffff'],
+  rainbow: null,
+};
+const colorOf = pal => PAL[pal] ? pick(PAL[pal]) : `hsl(${rand(360)},100%,60%)`;
+
+function shards(n, pal) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(Math.PI * 2), v = rand(400, 1500);
+    parts.push({ k: 'shard', x: CX + rand(-80, 80), y: CY + rand(-60, 60), vx: Math.cos(a) * v, vy: Math.sin(a) * v - 250,
+      r: rand(6.28), vr: rand(-14, 14), s: rand(8, 34), c: colorOf(pal), life: 0, max: rand(1.1, 2) });
+  }
+}
+function sparks(n, x, y, pal, speed = 1400, spread = Math.PI * 2, dir = 0) {
+  for (let i = 0; i < n; i++) {
+    const a = dir + rand(-spread / 2, spread / 2), v = rand(200, speed);
+    parts.push({ k: 'spark', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, c: colorOf(pal), life: 0, max: rand(0.4, 1) });
+  }
+}
+function twinkle(pal) {
+  parts.push({ k: 'star', x: CX + rand(-330, 330), y: CY + rand(-260, 260), c: colorOf(pal), s: rand(10, 30), life: 0, max: rand(0.4, 0.8) });
+}
+function stepParts(dt) {
+  for (const p of parts) {
+    p.life += dt;
+    if (p.k === 'star') continue;
+    p.vy += (p.k === 'shard' ? 1100 : 500) * dt;
+    p.vx *= 0.985; p.vy *= 0.985;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.k === 'shard') p.r += p.vr * dt;
+  }
+  parts = parts.filter(p => p.life < p.max);
+}
+function drawParts() {
+  for (const p of parts) {
+    const a = 1 - p.life / p.max;
+    if (p.k === 'shard') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.globalAlpha = a;
+      ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.moveTo(-p.s, -p.s * 0.4); ctx.lineTo(p.s, 0); ctx.lineTo(-p.s * 0.3, p.s * 0.6); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+  for (const p of parts) {
+    const a = 1 - p.life / p.max;
+    ctx.globalAlpha = a; ctx.strokeStyle = p.c;
+    if (p.k === 'spark') {
+      ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035); ctx.stroke();
+    } else if (p.k === 'star') {
+      const s = p.s * Math.sin(Math.PI * p.life / p.max);
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(p.x - s, p.y); ctx.lineTo(p.x + s, p.y); ctx.moveTo(p.x, p.y - s); ctx.lineTo(p.x, p.y + s); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// ───────── 背景・集中線・稲妻・枠の光 ─────────
+function drawBurst(style, t) {
+  if (style === 'rainbow' && ctx.createConicGradient) {
+    const cg = ctx.createConicGradient(t * 0.8, CX, CY);
+    ['#ff2d55', '#ff9500', '#ffe100', '#3ddc5a', '#18c8ff', '#2d6bff', '#c64dff', '#ff2d55'].forEach((c, i, a) => cg.addColorStop(i / (a.length - 1), c));
+    ctx.fillStyle = cg; ctx.fillRect(0, 0, W, H);
+    const rg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 900);
+    rg.addColorStop(0, 'rgba(255,255,255,0.95)'); rg.addColorStop(0.25, 'rgba(255,255,255,0)'); rg.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    return;
+  }
+  const stops = style === 'gold'
+    ? ['#fffbe0', '#ffcf3a', '#ff6a00', '#5a0000', '#000000']
+    : ['#ffffff', '#bfe0ff', '#3d6bff', '#120a4a', '#000000'];
+  const rg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 950);
+  [0, 0.12, 0.35, 0.7, 1].forEach((o, i) => rg.addColorStop(o, stops[i]));
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+}
+function drawRadial(alpha, n = 110) {
+  ctx.save(); ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rand(-0.02, 0.02), w = rand(0.002, 0.014), r0 = rand(230, 380);
+    ctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    ctx.lineTo(CX + Math.cos(a - w) * 1600, CY + Math.sin(a - w) * 1600);
+    ctx.lineTo(CX + Math.cos(a + w) * 1600, CY + Math.sin(a + w) * 1600);
+    ctx.closePath();
+  }
+  ctx.fill(); ctx.restore();
+}
+function boltPath(x1, y1, x2, y2, disp, depth = 6) {
+  let pts = [[x1, y1], [x2, y2]];
+  for (let d = 0; d < depth; d++) {
+    const np = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+      np.push([(ax + bx) / 2 + rand(-disp, disp), (ay + by) / 2 + rand(-disp, disp)], pts[i + 1]);
+    }
+    pts = np; disp *= 0.55;
+  }
+  return pts;
+}
+let bolts = [], boltAt = 0;
+function edgePoint() {
+  const s = Math.floor(rand(4));
+  return s === 0 ? [rand(W), -20] : s === 1 ? [W + 20, rand(H)] : s === 2 ? [rand(W), H + 20] : [-20, rand(H)];
+}
+function drawBolts(t, count) {
+  if (t - boltAt > 0.06) {
+    boltAt = t; bolts = [];
+    for (let i = 0; i < count; i++) {
+      const [x, y] = edgePoint();
+      bolts.push(boltPath(x, y, CX + rand(-260, 260), CY + rand(-200, 200), 140));
+    }
+  }
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  for (const [w, col] of [[16, 'rgba(110,140,255,0.22)'], [6, 'rgba(170,200,255,0.6)'], [2, '#ffffff']]) {
+    ctx.lineWidth = w; ctx.strokeStyle = col;
+    for (const b of bolts) { ctx.beginPath(); b.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+// 液晶のふちに並ぶ LED（台の枠が光るのを再現）
+const LEDS = (() => {
+  const pts = [], m = 16, step = 34;
+  for (let x = m; x <= W - m; x += step) pts.push([x, m]);
+  for (let y = m + step; y <= H - m; y += step) pts.push([W - m, y]);
+  for (let x = W - m - step; x >= m; x -= step) pts.push([x, H - m]);
+  for (let y = H - m - step; y > m; y -= step) pts.push([m, y]);
+  return pts;
+})();
+let ledHit = 0;
+function ledColor(i, mode, t) {
+  const chase = (speed, len, on) => (((i - t * speed) % len) + len) % len < on;
+  switch (mode) {
+    case 'idle': return [255, 40, 50, 0.22 + 0.18 * Math.sin(t * 2.2 + i * 0.15)];
+    case 'rumble': return Math.random() < 0.5 ? [255, 30, 40, rand(0.3, 1)] : null;
+    case 'hit': return ledHit > 0.02 ? [255, 255, 255, ledHit] : null;
+    case 'silver': return [190, 215, 255, chase(40, 8, 3) ? 1 : 0.18];
+    case 'gold': return [255, 185, 40, chase(36, 6, 3) ? 1 : 0.25];
+    case 'rainbow': return [...hsl2rgb((i * 9 + t * 520) % 360, 1, 0.6), 1];
+    default: return null;
+  }
+}
+function drawLEDs(mode, t) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  for (const [x, y] of LEDS) { ctx.beginPath(); ctx.arc(x, y, 5.5, 0, 7); ctx.fill(); }
+  ctx.globalCompositeOperation = 'lighter';
+  LEDS.forEach(([x, y], i) => {
+    const c = ledColor(i, mode, t);
+    if (!c) return;
+    const [r, g, b, a] = c;
+    ctx.fillStyle = `rgba(${r},${g},${b},${a * 0.22})`; ctx.beginPath(); ctx.arc(x, y, 16, 0, 7); ctx.fill();
+    ctx.fillStyle = `rgba(${r},${g},${b},${a})`; ctx.beginPath(); ctx.arc(x, y, 5.5, 0, 7); ctx.fill();
+  });
+  ctx.restore();
+}
+let vignette = null;
+function drawVignette() {
+  if (!vignette) {
+    vignette = ctx.createRadialGradient(CX, H / 2, 300, CX, H / 2, 900);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)'); vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
+  }
+  ctx.fillStyle = vignette; ctx.fillRect(0, 0, W, H);
+}
+
+// 文字を描く（色の塗り替え中は左から新しい色にする）
+const shineCanvas = document.createElement('canvas');
+function drawWord(t, cs, sc, alpha = 1) {
+  const P = run.plates, p0 = P[cs.cur];
+  const s = fitScale(p0) * sc;
+  ctx.save(); ctx.translate(CX, CY); ctx.scale(s, s); ctx.globalAlpha = alpha;
+  if (!cs.nxt) {
+    // ときどき光の帯が横切る
+    const ph = ((t * 0.7) % 1.6);
+    if (ph < 0.6) {
+      shineCanvas.width = p0.w; shineCanvas.height = p0.h;
+      const sg = shineCanvas.getContext('2d');
+      sg.drawImage(p0.c, 0, 0);
+      sg.globalCompositeOperation = 'source-atop';
+      const x = -p0.w * 0.3 + (ph / 0.6) * p0.w * 1.6;
+      const gr = sg.createLinearGradient(x - 120, 0, x + 120, p0.h * 0.4);
+      gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      sg.fillStyle = gr; sg.fillRect(0, 0, p0.w, p0.h);
+      ctx.drawImage(shineCanvas, -p0.w / 2, -p0.h / 2);
+    } else {
+      ctx.drawImage(p0.c, -p0.w / 2, -p0.h / 2);
+    }
+  } else {
+    ctx.drawImage(p0.c, -p0.w / 2, -p0.h / 2);
+    const p1 = P[cs.nxt];
+    const ex = -p1.w / 2 + p1.w * easeOut(cs.p);
+    ctx.save(); ctx.beginPath(); ctx.rect(-p1.w / 2, -p1.h / 2, ex + p1.w / 2, p1.h); ctx.clip();
+    ctx.drawImage(p1.c, -p1.w / 2, -p1.h / 2); ctx.restore();
+    ctx.globalCompositeOperation = 'lighter';
+    const gr = ctx.createLinearGradient(ex - 70, 0, ex + 70, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,220,0.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.fillRect(ex - 70, -p1.h / 2, 140, p1.h);
+  }
+  ctx.restore();
+  return s;
+}
+
+// ───────── 演出の流れ ─────────
+let run = null, shake = 0, flashA = 0, flashCol = '255,255,255';
+let fakeNow = null;
+const clock = () => fakeNow !== null ? fakeNow : ac ? ac.currentTime : performance.now() / 1000;
+
+function startRun() {
+  initAudio();
+  if (ac && ac.state !== 'running') ac.resume();
+  const text = (wordEl.value.trim() || '激アツ').replace(/\s+/g, '');
+  const chars = Array.from(text);
+  const tame = parseFloat(document.querySelector('input[name=tame]:checked').value);
+  const finish = document.querySelector('input[name=finish]:checked').value;
+  // チラ見せは最大4文字。見栄えのする漢字・カタカナ・英数字を優先し、長い言葉は飛び飛びに選ぶ
+  const strong = chars.filter(c => /[\p{Script=Han}\p{Script=Katakana}A-Za-z0-9]/u.test(c));
+  const pool = strong.length ? strong : chars;
+  const n = Math.min(4, pool.length);
+  const tease = Array.from({ length: n }, (_, i) => pool[Math.round(i * (pool.length - 1) / Math.max(1, n - 1))]);
+  const lines = splitLines(text);
+
+  const T = {};
+  T.cut = 1.2;                    // うなり → ブツッ
+  T.s0 = T.cut + tame;            // 暗転・無音のあと、チラ見せ開始
+  T.s1 = T.s0 + n * PER;          // 閃光
+  T.s2 = T.s1 + 0.12;             // 文字が飛んでくる
+  T.imp = T.s2 + 0.2;             // ドン
+  const wipes = [{ t: T.imp + 1.2, to: 'gold' }];
+  if (finish === 'rainbow') wipes.push({ t: wipes[0].t + WIPE + 0.9, to: 'rainbow' });
+  const lastW = wipes[wipes.length - 1];
+  T.end = lastW.t + WIPE + 0.8;
+
+  const start = clock() + 0.06;
+  run = {
+    start, T, wipes, tease, finish, fired: new Set(), lastImpact: -9,
+    plates: {
+      silver: makePlate(lines, 'silver', platePx(text)),
+      gold: makePlate(lines, 'gold', platePx(text)),
+      rainbow: makePlate(lines, 'rainbow', platePx(text)),
+    },
+    close: tease.map(ch => makePlate([ch], 'silver', 520)),
+  };
+  parts = [];
+
+  if (ac) {
+    const b = start;
+    SFX.rumble(b, T.cut);
+    tease.forEach((_, k) => SFX.hit(b + T.s0 + k * PER + 0.07));
+    SFX.whoosh(b + T.s1 - 0.4, 0.5);
+    SFX.boom(b + T.imp);
+    SFX.kyuin(b + T.imp, 1180, 1.6, 0.2);
+    wipes.forEach((w, i) => {
+      const last = i === wipes.length - 1;
+      SFX.arp(b + w.t);
+      SFX.boom(b + w.t + WIPE, last ? 0.9 : 0.5);
+      SFX.kyuin(b + w.t + WIPE, last ? 1480 : 1320, last ? 2.4 : 1.3, last ? 0.24 : 0.18);
+      if (last) SFX.shimmer(b + w.t + WIPE, 4.5);
+    });
+  }
+  pushBtn.disabled = true;
+}
+
+function colorAt(t) {
+  let cur = 'silver';
+  for (const w of run.wipes) {
+    if (t >= w.t + WIPE) cur = w.to;
+    else if (t >= w.t) return { cur, nxt: w.to, p: (t - w.t) / WIPE };
+    else break;
+  }
+  return { cur, nxt: null, p: 0 };
+}
+
+function fire(name, t, at, fn) {
+  if (t >= at && !run.fired.has(name)) { run.fired.add(name); fn(); }
+}
+
+function events(t) {
+  const T = run.T;
+  run.tease.forEach((_, k) => fire('tease' + k, t, T.s0 + k * PER + 0.07, () => { shake = 20; ledHit = 1; }));
+  fire('impact', t, T.imp, () => {
+    shake = 48; flashA = 1; flashCol = '255,255,255'; run.lastImpact = t;
+    shards(70, 'silver'); sparks(140, CX, CY, 'silver');
+  });
+  run.wipes.forEach((w, i) => fire('wipe' + i, t, w.t + WIPE, () => {
+    shake = 28; flashA = 0.75; flashCol = w.to === 'gold' ? '255,236,170' : '255,255,255'; run.lastImpact = t;
+    shards(50, w.to); sparks(180, CX, CY, w.to);
+  }));
+  fire('done', t, T.end, () => { pushBtn.disabled = false; });
+}
+
+function drawRun(t, dt) {
+  const T = run.T;
+  events(t);
+  let led = 'off';
+
+  ctx.save();
+  shake *= Math.exp(-dt * 7);
+  ctx.translate(rand(-1, 1) * shake * MOTION, rand(-1, 1) * shake * MOTION);
+
+  if (t < T.cut) {
+    // うなり：赤くにじみ、揺れが強くなる
+    const u = Math.max(0, t / T.cut);
+    const rg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 900);
+    rg.addColorStop(0, `rgba(170,0,20,${0.15 + u * 0.75})`); rg.addColorStop(1, 'rgba(0,0,0,1)');
+    ctx.fillStyle = rg; ctx.fillRect(-40, -40, W + 80, H + 80);
+    drawRadial(0.04 + u * 0.12, 70);
+    shake = Math.max(shake, u * 12);
+    led = 'rumble';
+  } else if (t < T.s0) {
+    // 暗転・無音（なにも描かない）
+  } else if (t < T.s1) {
+    // チラ見せ：1文字ずつ超アップ
+    const k = Math.min(run.tease.length - 1, Math.floor((t - T.s0) / PER));
+    const lt = t - T.s0 - k * PER;
+    led = 'hit';
+    if (lt >= 0.07) {
+      const u = (lt - 0.07) / (PER - 0.07);
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#02030c'); bg.addColorStop(0.5, '#0c1640'); bg.addColorStop(1, '#02030c');
+      ctx.fillStyle = bg; ctx.fillRect(-40, -40, W + 80, H + 80);
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(150,180,255,0.35)';
+      for (let i = 0; i < 26; i++) {
+        const y = rand(H), len = rand(150, 600), x = rand(-200, W);
+        ctx.lineWidth = rand(1, 4); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+      }
+      ctx.restore();
+      const p = run.close[k], dir = k % 2 ? 1 : -1;
+      ctx.save();
+      ctx.translate(CX + dir * (140 - 280 * u), CY + ((k % 3) - 1) * 90);
+      ctx.rotate(dir * 0.07);
+      const s = 1.9 + 0.35 * u;
+      ctx.scale(s, s);
+      ctx.drawImage(p.c, -p.w / 2, -p.h / 2);
+      ctx.restore();
+    }
+  } else if (t < T.s2) {
+    // 閃光：青の反転 → 白
+    ctx.fillStyle = t - T.s1 < 0.05 ? '#1a3cff' : '#ffffff';
+    ctx.fillRect(-40, -40, W + 80, H + 80);
+    led = 'silver';
+  } else {
+    const cs = colorAt(t);
+    drawBurst(cs.cur, t);
+    if (cs.nxt) { ctx.globalAlpha = cs.p; drawBurst(cs.nxt, t); ctx.globalAlpha = 1; }
+    if (t >= T.imp) {
+      drawRadial(cs.cur === 'silver' && !cs.nxt ? 0.5 : 0.38);
+      drawBolts(t, t - T.imp < 1.5 ? 5 : 3);
+    }
+    let sc, alpha = 1;
+    if (t < T.imp) {
+      const k = (t - T.s2) / (T.imp - T.s2);
+      sc = 3.2 - 2.2 * k * k; alpha = k;
+      ctx.fillStyle = `rgba(255,255,255,${1 - k * 0.7})`; ctx.fillRect(-40, -40, W + 80, H + 80);
+    } else {
+      sc = 1 + 0.16 * Math.exp(-Math.max(0, t - run.lastImpact) * 9) + 0.012 * Math.sin(t * 6);
+    }
+    const s = drawWord(t, cs, sc, alpha);
+    if (cs.nxt) {
+      const p1 = run.plates[cs.nxt];
+      const ex = CX + (-p1.w / 2 + p1.w * easeOut(cs.p)) * s;
+      for (let i = 0; i < 5; i++) sparks(1, ex, CY + rand(-p1.gh / 2, p1.gh / 2) * s, cs.nxt, 900, Math.PI * 0.8, -Math.PI / 2);
+    }
+    if (t > T.imp && Math.random() < 0.5) twinkle(cs.nxt || cs.cur);
+    led = cs.nxt || cs.cur;
+  }
+  stepParts(dt);
+  drawParts();
+  ctx.restore();
+
+  if (flashA > 0.01) {
+    ctx.fillStyle = `rgba(${flashCol},${flashA})`; ctx.fillRect(0, 0, W, H);
+    flashA *= Math.exp(-dt * 6);
+  }
+  ledHit *= Math.exp(-dt * 9);
+  drawVignette();
+  drawLEDs(led, t);
+}
+
+// 待っている間の画面
+function drawIdle(t) {
+  const rg = ctx.createRadialGradient(CX, CY, 0, CX, CY, 900);
+  rg.addColorStop(0, '#2a0509'); rg.addColorStop(1, '#000');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  const text = (wordEl.value.trim() || '激アツ').replace(/\s+/g, '');
+  if (fontReady) {
+    const p = makePlate(splitLines(text), 'silver', platePx(text));
+    const s = fitScale(p) * 0.82 * (1 + 0.01 * Math.sin(t * 2));
+    ctx.save(); ctx.translate(CX, CY); ctx.scale(s, s); ctx.globalAlpha = 0.5;
+    ctx.drawImage(p.c, -p.w / 2, -p.h / 2); ctx.restore();
+  }
+  drawVignette();
+  drawLEDs('idle', t);
+}
+
+// ───────── 動かす ─────────
+let lastFrame = performance.now() / 1000;
+function frame() {
+  const now = performance.now() / 1000;
+  const dt = Math.min(0.05, now - lastFrame);
+  lastFrame = now;
+  render(now, dt);
+  requestAnimationFrame(frame);
+}
+function render(now, dt) {
+  ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  if (run) {
+    const t = clock() - run.start;
+    if (t < 0) drawIdle(now); else drawRun(t, dt);
+  } else {
+    drawIdle(now);
+  }
+}
+requestAnimationFrame(frame);
+
+// 確認用：時間を1コマずつ進めて、指定した時刻の画面を集める（画面が隠れていても動く）
+window.__simulate = function (times, fps = 60) {
+  fakeNow = 0;
+  startRun();
+  if (master) master.gain.value = 0;
+  const out = [], list = typeof times === 'function' ? times(run.T, run.wipes) : times;
+  let t = 0, i = 0;
+  while (i < list.length) {
+    t += 1 / fps; fakeNow = run.start + t;
+    render(t, 1 / fps);
+    while (i < list.length && t >= list[i]) { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0); out.push([list[i], c]); i++; }
+  }
+  fakeNow = null;
+  return out;
+};
+
+pushBtn.addEventListener('click', () => { if (!pushBtn.disabled) startRun(); });
+wordEl.addEventListener('input', () => { if (run && run.fired.has('done')) run = null; });
+wordEl.addEventListener('keydown', e => { if (e.key === 'Enter') { wordEl.blur(); } });
+</script>
+</body>
+</html>
