@@ -35,12 +35,9 @@ namespace PachiMoji
             public float faceInset = -4;     // 表の面は輪郭より少し内側
             // 表の面の丸み：輪郭から内側へ (offset, 奥行き) の段を重ねて、中ほどを手前へ盛り上げる（面ごとに映り込みが変わる）
             public Vector2[] faceBulge = { new Vector2(-4, 0), new Vector2(-14, -3), new Vector2(-30, -5) };
-            // 側面の段々：外周から (offset, 奥行き) を順にたどる。offset が変わる所は面取りの段になる
-            public Vector2[] sideProfile =
-            {
-                new Vector2(0, 32), new Vector2(0, 150), new Vector2(-12, 160), new Vector2(-12, 182), new Vector2(0, 194),
-                new Vector2(0, 300), new Vector2(-12, 310), new Vector2(-12, 332), new Vector2(0, 344), new Vector2(0, 470),
-            };
+            // 側面：外周から (offset, 奥行き) を順にたどる。段々は手前のフチだけにして、側面は一続きの塊にする
+            // （途中に溝を入れると、板を何枚も重ねたように見える）
+            public Vector2[] sideProfile = { new Vector2(0, 32), new Vector2(0, 470) };
             public Step[] steps;             // 字の輪郭まわりの段（細い線・溝）。offset は字の輪郭から
             public float silhouette = 95;    // 言葉全体の外周（字の輪郭からこれだけ太らせ、穴は埋める）
             public float floorZ = 40;        // 字のすき間の、沈んだ床の奥行き
@@ -223,6 +220,9 @@ namespace PachiMoji
             Fill(b, OffS(back.x), null, back.y, back.y, new Vector3(0, 0, 1), Part.Side);
 
             var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
+            // uv.y に奥行き（0＝手前、1＝いちばん奥）を入れる。材質で奥ほど暗くするのに使う
+            float zMax = style.sideProfile[style.sideProfile.Length - 1].y;
+            for (int i = 0; i < b.uv.Count; i++) b.uv[i] = new Vector2(b.uv[i].x, Mathf.Clamp01((b.v[i].z - 30) / (zMax - 30)));
             for (int i = 0; i < b.v.Count; i++) b.v[i] *= scale;
             mesh.SetVertices(b.v);
             mesh.SetNormals(b.n);

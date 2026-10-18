@@ -15,6 +15,7 @@ Shader "PachiMoji/Metal"
         _Sweep ("Sweep", Float) = 0.0
         _Diffuse ("Facet Diffuse", Float) = 0.2
         _Brightness ("Brightness", Float) = 1
+        _BackFade ("Back Fade", Float) = 0.3
     }
     SubShader
     {
@@ -32,7 +33,7 @@ Shader "PachiMoji/Metal"
             TEXTURE2D(_Ramp); SAMPLER(sampler_Ramp);
             CBUFFER_START(UnityPerMaterial)
                 float4 _Ramp_ST;
-                float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness;
+                float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness, _BackFade;
             CBUFFER_END
 
             struct A { float4 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
@@ -99,6 +100,8 @@ Shader "PachiMoji/Metal"
                     c = SAMPLE_TEXTURE2D(_Ramp, sampler_Ramp, float2(L, 0.5)).rgb;
                 }
                 c *= _Brightness;
+                // 側面は奥へ行くほど暗く沈める（塊の重さが出る）
+                c *= lerp(1, _BackFade, i.uv.y);
                 // 一番明るいところだけ 1 を超えさせる（ブルームで光る）
                 c *= 1 + _Boost * pow(L, 12);
                 return half4(c, 1);

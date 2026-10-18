@@ -54,6 +54,15 @@ namespace PachiMoji
             return go;
         }
 
+        // 側面用：そのままだと横向き・下向きの壁に暗い地面が映って真っ黒になるので、水平線を大きく下げる
+        static Material SideMetal(string ramp)
+        {
+            var m = Metal(ramp, false, 1.5f);
+            m.SetFloat("_Horizon", -0.7f);   // 横向き・下向きの面にも空が映る
+            m.SetFloat("_Diffuse", 0.5f);    // 面ごとの明暗は光の当たり方で付ける
+            return m;
+        }
+
         static Material Metal(string ramp, bool rainbow = false, float boost = 3f)
         {
             var m = new Material(Shader.Find("PachiMoji/Metal"));
@@ -69,11 +78,11 @@ namespace PachiMoji
             switch (f)
             {
                 case Finish.Silver:
-                    return new[] { Metal("silver"), Metal("silverLine"), Metal("black", false, 0), Metal("silver"), Metal("silverSide") };
+                    return new[] { Metal("silver"), Metal("silverLine"), Metal("black", false, 0), Metal("silver"), SideMetal("silverSide") };
                 case Finish.Rainbow:
-                    return new[] { Metal(null, true, 2), Metal("silverLine"), Metal("black", false, 0), Metal("goldRim"), Metal("goldSide") };
+                    return new[] { Metal(null, true, 2), Metal("silverLine"), Metal("black", false, 0), Metal("goldRim"), SideMetal("goldSide") };
                 default:
-                    return new[] { Metal("gold"), Metal("goldLine"), Metal("black", false, 0), Metal("goldRim"), Metal("goldSide") };
+                    return new[] { Metal("gold"), Metal("goldLine"), Metal("black", false, 0), Metal("goldRim"), SideMetal("goldSide") };
             }
         }
     }
