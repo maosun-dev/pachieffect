@@ -24,11 +24,12 @@ namespace PachiMoji
         public const float Tame = 1.3f;         // 暗転（無音）の長さ
         public const float RayLen = 0.6f;       // 最後のチラ見せのあと、文字の裏から光が吹き出す長さ
         public const float Pre = 0.35f;         // 昇格の前ぶれ（暗くなって震える）
-        public const float WhiteGold = 0.12f;   // 金に変わる前に白く飛ぶ長さ
-        public const float SlashDraw = 0.15f;   // 切り裂きの光線が画面を横切る長さ
-        public const float GrayHold = 1.2f;     // 切り裂かれて灰色に固まったままタメる長さ
-        public const float Spin = 0.7f;         // 虹になったあとの1回転の長さ
-        public const float SpinRest = 0.45f;    // 1回転と1回転のあいだに止まる長さ
+        // 昇格まわりの長さは、範囲から時刻を決める PromoTimeline と同じものを使う
+        public const float WhiteGold = PromoTimeline.WhiteGold;
+        public const float SlashDraw = PromoTimeline.SlashDraw;
+        public const float GrayHold = PromoTimeline.GrayHold;
+        public const float Spin = PromoTimeline.Spin;
+        public const float SpinRest = PromoTimeline.SpinRest;
         public const float HitStop = 0.1f;      // ドンの瞬間に全体を止める長さ（ヒットストップ）
         const float Punch = 7;                  // ドンの瞬間にカメラがぐっと寄る量（画角を何度せまくするか）
 
@@ -38,10 +39,13 @@ namespace PachiMoji
         public float SlamStart => FlashStart + 0.14f;
         public float Impact => SlamStart + 0.2f;
         public float ImpactEnd => Impact + HitStop;   // 止まっていた時間が動き出す時刻
-        public float GoldAt => ImpactEnd + 1.3f;          // 白飛びの始まり。色が切り替わるのは +WhiteGold
-        public float SlashAt => GoldAt + WhiteGold + 1.7f;              // 金のあと、切り裂かれる
-        public float RainbowAt => SlashAt + SlashDraw + GrayHold;       // 灰色のタメのあと、一気に虹
-        public float End => RainbowAt + 2 * Spin + SpinRest + 1.8f;
+        // ドンのあとの時刻は、昇格の範囲（設定のはじまり・おわりの色）から決める。起きない出来事は +∞
+        PromoTimes times;
+        public float GoldAt => times.GoldAt;         // 白飛びの始まり。色が切り替わるのは +WhiteGold
+        public float SlashAt => times.SlashAt;       // 金のあと、切り裂かれる
+        public float RainbowAt => times.RainbowAt;   // 灰色のタメのあと、一気に虹
+        public float SpinAt => times.SpinAt;         // 虹の1回転目の始まり（虹で着地したときは着地の少しあと）
+        public float End => times.End;
 
         // ───────── 舞台の部品 ─────────
         public Camera cam;
@@ -51,6 +55,8 @@ namespace PachiMoji
         PachiSparks sparks;   // ドンではじける火花
         /// <summary>ドンの火花を出すか（好みで消せる）</summary>
         public bool SparksOn = true;
+        EffectSettings settings;
+        PachiText.Finish land;   // ドンで着地するときの色（昇格のはじまりの色）
         Transform bg; float aspect;
         const float BgDist = 60;
         int teaseCount;
@@ -62,9 +68,15 @@ namespace PachiMoji
         Quaternion textBaseRot;
         const float BaseFov = 32;
 
-        public static PachiStage Build(string[] lines, float aspect, string font = "ReggaeOne")
+        /// <param name="settings">演出の好み。null なら既定（銀→虹・火花あり・青白の光・Reggae One）</param>
+        public static PachiStage Build(string[] lines, float aspect, EffectSettings settings = null)
         {
             var st = new PachiStage();
+            settings = settings?.Clone() ?? new EffectSettings();
+            st.settings = settings;
+            st.SparksOn = settings.SparksOn;
+            st.land = FinishOf(settings.From);
+            string font = settings.FontName;
 
             // 文字（基本の向き：斜め下から見上げて側面を見せる）
             var go = PachiText.Create(lines, PachiText.Finish.Silver, font);
@@ -83,6 +95,7 @@ namespace PachiMoji
                 cur += st.teaseLen[k];
             }
             st.RayStart = cur;
+            st.times = PromoTimeline.Plan(st.ImpactEnd, settings.From, settings.To);
 
             // チラ見せ用の1文字ずつの立体。ふだんは隠しておく
             var chars = string.Concat(lines).Replace(" ", "").Replace("　", "");
@@ -150,6 +163,8 @@ namespace PachiMoji
             rq.transform.localPosition = new Vector3(0, 0, 0.21f);
             rq.transform.localScale = new Vector3(2, 2, 1);
             st.raysMat = new Material(Shader.Find("PachiMoji/Rays"));
+            st.raysMat.SetColor("_PTint", LightTint(settings.Light));
+            st.raysMat.SetFloat("_PRainbow", settings.Light == LightColor.Rainbow ? 1 : 0);
             rq.GetComponent<MeshRenderer>().sharedMaterial = st.raysMat;
 
             // 光のにじみ（ブルーム）
@@ -164,6 +179,17 @@ namespace PachiMoji
             vol.sharedProfile = profile;
             return st;
         }
+
+        static PachiText.Finish FinishOf(Tier t) =>
+            t == Tier.Gold ? PachiText.Finish.Gold : t == Tier.Rainbow ? PachiText.Finish.Rainbow : PachiText.Finish.Silver;
+
+        // プチュンの光の色（虹はシェーダーの中で色相を回すので、ここは使わない）
+        static Color LightTint(LightColor c) => c switch
+        {
+            LightColor.Gold => new Color(1.0f, 0.78f, 0.30f),
+            LightColor.Red => new Color(1.0f, 0.25f, 0.20f),
+            _ => new Color(0.55f, 0.75f, 1.0f),
+        };
 
         static float Clamp01(float x) => Mathf.Clamp01(x);
         static float Decay(float t, float at, float k) => t < at ? 0 : Mathf.Exp(-(t - at) * k);
@@ -310,8 +336,10 @@ namespace PachiMoji
             {
                 var g = PromoAt(t, GoldAt, WhiteGold);
                 bool cut = t >= SlashAt && t < RainbowAt;          // 切り裂かれて灰色でタメている間
-                bool rain = t >= RainbowAt;
+                bool rain = t >= RainbowAt;                         // 昇格して虹になった（虹で着地したときは偽）
                 float rx = t - RainbowAt;
+                bool goldLand = land == PachiText.Finish.Gold, rainLand = land == PachiText.Finish.Rainbow;
+                float spinEnd = SpinAt + 2 * Spin + SpinRest;
                 if (t < Impact)
                 {
                     // 銀の文字が手前から飛んできて、ドン
@@ -323,11 +351,13 @@ namespace PachiMoji
                 else
                 {
                     // 余韻：ゆっくり揺れて、少しずつ寄る。切り裂かれたら止まる。虹のあとは回転してから揺れ直す
-                    float h = rain ? Mathf.Max(0, rx - 2 * Spin - SpinRest) : Mathf.Max(0, Mathf.Min(t, SlashAt) - ImpactEnd);
+                    // 揺れの経過：回り終えてからは回り終えた時刻から。虹で着地して回る前は止めておく
+                    float h = t >= SpinAt ? Mathf.Max(0, t - spinEnd) : rainLand ? 0 : Mathf.Max(0, Mathf.Min(t, SlashAt) - ImpactEnd);
                     float spin = 0;
-                    if (rain)
+                    if (t >= SpinAt)
                     {
-                        float e1 = Clamp01(rx / Spin), e2 = Clamp01((rx - Spin - SpinRest) / Spin);
+                        float sx = t - SpinAt;
+                        float e1 = Clamp01(sx / Spin), e2 = Clamp01((sx - Spin - SpinRest) / Spin);
                         spin = 360 * (1 - Mathf.Pow(1 - e1, 3)) + 360 * (1 - Mathf.Pow(1 - e2, 3));   // 1回転 → 止まる → 1回転
                     }
                     rot = textBaseRot * Quaternion.Euler(0, Mathf.Sin(h * 0.7f) * 4 + spin, 0);
@@ -340,7 +370,7 @@ namespace PachiMoji
                 }
 
                 // 今の色：銀 → 金（白飛びのあと一瞬で切り替える）→ 切り裂かれて灰色 → 一気に虹
-                var fin = rain ? PachiText.Finish.Rainbow : g.snapped ? PachiText.Finish.Gold : PachiText.Finish.Silver;
+                var fin = rain ? PachiText.Finish.Rainbow : g.snapped ? PachiText.Finish.Gold : land;
                 look = (fin, fin, 0f);
 
                 float pre = rain ? 0 : g.pre;
@@ -352,7 +382,9 @@ namespace PachiMoji
                 if (rain || g.snapped) scale *= 1 + (rain ? 0.22f : 0.17f) * Mathf.Exp(-since * 6) * Mathf.Cos(since * 16);   // 跳ねて戻る
 
                 // 金に変わったあと、表面を光の筋が1本サッと横切る
-                if (!rain && !cut && g.snapped && g.x > 0.2f && g.x < 0.65f) { look = (fin, fin, (g.x - 0.2f) / 0.45f); lookGlow = 2.8f; }
+                // 金で着地したときは、着地のあとに同じ筋を出す
+                float gx = goldLand ? t - ImpactEnd : g.x;
+                if (!rain && !cut && (g.snapped || goldLand) && gx > 0.2f && gx < 0.65f) { look = (fin, fin, (gx - 0.2f) / 0.45f); lookGlow = 2.8f; }
 
                 // 背景：銀は青、金は炎、虹は虹（ときどき青・炎に切り替わり続ける）
                 if (fin == PachiText.Finish.Silver) bgMode = 2;
@@ -361,7 +393,7 @@ namespace PachiMoji
                 {
                     int[] cyc = { 1, 1, 1, 2, 1, 1, 0 };
                     bgMode = cyc[(int)(t / 0.1f) % cyc.Length];
-                    hue = rx * 0.25f;
+                    hue = (t - (rain ? RainbowAt : ImpactEnd)) * 0.25f;   // 虹になった時刻から色が流れる
                 }
                 bgRays = pop * (rain ? 2.0f : 1.4f); bgReach = 2.4f;
                 fgRays = pop * (rain ? 0.6f : 0.35f); fgReach = 2.4f;
@@ -458,7 +490,7 @@ namespace PachiMoji
             raysMat.SetFloat("_PFlash", pFlash);
             raysMat.SetFloat("_PDot", pDot);
             raysMat.SetFloat("_PArc", pArc);
-            raysMat.SetFloat("_PScale", pScale);
+            raysMat.SetFloat("_PScale", pScale * settings.LightScale);
             flashMat.SetColor("_Color", flash);
         }
     }

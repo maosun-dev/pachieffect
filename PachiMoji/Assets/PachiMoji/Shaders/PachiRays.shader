@@ -1,6 +1,6 @@
 // 光の放射：画面の中心から吹き出す、虹色がかった細い光の筋。カメラの目の前の板に足し算で重ねる
 // （チラ見せの超アップでは文字が画面いっぱいで背景が映らないので、手前に重ねて「文字の裏から光が漏れる」ように見せる）
-// あわせて、切り裂き（画面を斜めに横切る紫の光線）と、プチュン（青白い閃光 → 中心の光の点のまわりに青い電気）もここで描く
+// あわせて、切り裂き（画面を斜めに横切る紫の光線）と、プチュン（閃光 → 中心の光の点のまわりに電気。色は _PTint・_PRainbow）もここで描く
 Shader "PachiMoji/Rays"
 {
     Properties
@@ -14,6 +14,8 @@ Shader "PachiMoji/Rays"
         _PDot ("Puchun Dot", Float) = 0
         _PArc ("Puchun Arcs", Float) = 0
         _PScale ("Puchun Flare Scale", Float) = 1
+        _PTint ("Puchun Tint", Color) = (0.55, 0.75, 1, 1)
+        _PRainbow ("Puchun Rainbow", Float) = 0
     }
     SubShader
     {
@@ -29,7 +31,8 @@ Shader "PachiMoji/Rays"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc, _PScale;
+                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc, _PScale, _PRainbow;
+                float4 _PTint;
             CBUFFER_END
             float4 vert(float4 pos : POSITION) : SV_POSITION { return TransformObjectToHClip(pos.xyz); }
 
@@ -88,9 +91,10 @@ Shader "PachiMoji/Rays"
                 // プチュン
                 if (_PFlash + _PDot + _PArc > 0)
                 {
-                    float3 ice = float3(0.55, 0.75, 1.0);
-                    // 青白い閃光：画面いっぱい＋真ん中に横長の光の筋
-                    c += (float3(0.75, 0.85, 1.0) * (0.9 - 0.35 * saturate(r)) + float3(1, 1, 1) * exp(-abs(p.y) * 22) * 1.5) * _PFlash;
+                    // 光の色（設定で選ぶ）。虹は中心からの角度と時刻で色相が回る
+                    float3 ice = _PRainbow > 0.5 ? hsv2rgb(frac(a + _T * 0.5), 0.6, 1) : _PTint.rgb;
+                    // 閃光：画面いっぱい（光の色を白に寄せたもの）＋真ん中に横長の光の筋
+                    c += (lerp(ice, float3(1, 1, 1), 0.45) * (0.9 - 0.35 * saturate(r)) + float3(1, 1, 1) * exp(-abs(p.y) * 22) * 1.5) * _PFlash;
                     // レンズフレア（参考：プチュンEFの作り方）。_PScale で全体の大きさ
                     float sc = max(_PScale, 0.05);
                     float2 q = p / sc; float rq = length(q);

@@ -8,3 +8,5 @@ captures/play_*.png
 captures/unity-test.log
 captures/test-results.xml
 captures/unity-compile.log
+captures/puchun_*.png
+captures/movie_range_*

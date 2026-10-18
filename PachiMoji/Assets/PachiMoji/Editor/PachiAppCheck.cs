@@ -50,6 +50,12 @@ namespace PachiMoji.EditorTools
                 Directory.CreateDirectory(outDir);
                 Shot(720, 1280, Path.Combine(outDir, "play_9x16.png"));
                 Shot(720, 1560, Path.Combine(outDir, "play_9x19.png"));
+
+                // プチュンの光の色と大きさ（閃光が引いて、光の点が点滅している 0.55 秒目）
+                Shot(720, 1280, Path.Combine(outDir, "puchun_gold_large.png"),
+                    new EffectSettings { Light = LightColor.Gold, Size = LightSize.Large }, 0.55f);
+                Shot(720, 1280, Path.Combine(outDir, "puchun_rainbow_small.png"),
+                    new EffectSettings { Light = LightColor.Rainbow, Size = LightSize.Small }, 0.55f);
             }
             catch (Exception e)
             {
@@ -68,12 +74,12 @@ namespace PachiMoji.EditorTools
             Debug.LogError("[PachiAppCheck] NG: " + what);
         }
 
-        // 虹で回り終えた余韻の姿を1枚描く（回転中だと文字が横向きで収まりが見えない）
-        static void Shot(int w, int h, string path)
+        // 1枚描く。時刻を決めなければ、虹で回り終えた余韻の姿（回転中だと文字が横向きで収まりが見えない）
+        static void Shot(int w, int h, string path, EffectSettings settings = null, float t = -1)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var st = PachiStage.Build(PachiPlayer.Words, (float)w / h);
-            st.Evaluate(st.End - 0.5f);
+            var st = PachiStage.Build(PachiPlayer.Words, (float)w / h, settings);
+            st.Evaluate(t >= 0 ? t : st.End - 0.5f);
             var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             st.cam.targetTexture = rt;
             st.cam.Render();

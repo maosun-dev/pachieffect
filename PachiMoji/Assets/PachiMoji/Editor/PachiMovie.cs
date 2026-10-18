@@ -15,6 +15,7 @@ namespace PachiMoji.EditorTools
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiMovie.Run で動かす。
     /// 確認を速くするため、環境変数で書き出す範囲と画質を絞れる（movie.sh の引数から渡す）：
     ///   PACHI_FROM / PACHI_TO＝書き出す秒の範囲、PACHI_QUICK=1＝2倍で描いて縮めるのをやめる（細部は粗くなる）
+    ///   PACHI_RANGE＝昇格の範囲（SS/SG/SR/GG/GR/RR。S=銀・G=金・R=虹。無ければ既定の SR）
     /// </summary>
     public static class PachiMovie
     {
@@ -30,8 +31,18 @@ namespace PachiMoji.EditorTools
                 float from = EnvFloat("PACHI_FROM", 0), to = EnvFloat("PACHI_TO", -1);
                 bool quick = Environment.GetEnvironmentVariable("PACHI_QUICK") == "1";
                 bool part = from > 0 || to >= 0;
+                string range = (Environment.GetEnvironmentVariable("PACHI_RANGE") ?? "").Trim().ToUpperInvariant();
+                var settings = new EffectSettings();
+                string sheet = part ? "movie_part_sheet.png" : "movie_teiji_sheet.png";
+                if (range.Length > 0)
+                {
+                    if (range.Length != 2) throw new Exception("PACHI_RANGE は2文字（例 GR）: " + range);
+                    settings.From = TierOf(range[0]);
+                    settings.To = TierOf(range[1]);
+                    sheet = $"movie_range_{range}_sheet.png";
+                }
                 Render(new[] { "定時", "退社" }, 720, 1280, Path.Combine(outDir, "frames"),
-                    Path.Combine(outDir, part ? "movie_part_sheet.png" : "movie_teiji_sheet.png"), from, to, quick);
+                    Path.Combine(outDir, sheet), from, to, quick, settings);
             }
             catch (Exception e)
             {
@@ -41,14 +52,22 @@ namespace PachiMoji.EditorTools
             if (Application.isBatchMode) EditorApplication.Exit(code);
         }
 
+        static Tier TierOf(char c) => c switch
+        {
+            'S' => Tier.Silver,
+            'G' => Tier.Gold,
+            'R' => Tier.Rainbow,
+            _ => throw new Exception("昇格の色は S/G/R のどれか: " + c),
+        };
+
         static float EnvFloat(string name, float def) =>
             float.TryParse(Environment.GetEnvironmentVariable(name), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : def;
 
-        static void Render(string[] lines, int w, int h, string frameDir, string sheetPath, float from, float to, bool quick)
+        static void Render(string[] lines, int w, int h, string frameDir, string sheetPath, float from, float to, bool quick, EffectSettings settings)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var st = PachiStage.Build(lines, (float)w / h);
+            var st = PachiStage.Build(lines, (float)w / h, settings);
 
             // 2倍の大きさで描いて縮める（ギザギザを消す）
             int ss = quick ? 1 : 2;
@@ -97,7 +116,7 @@ namespace PachiMoji.EditorTools
             File.WriteAllBytes(sheetPath, sheet.EncodeToPNG());
             st.cam.targetTexture = null;
             big.Release(); small.Release();
-            Debug.Log($"[PachiMovie] saved frames={total} from={first / (float)Fps:F2} seconds={st.End:F2} quick={quick}");
+            Debug.Log($"[PachiMovie] saved frames={total} from={first / (float)Fps:F2} seconds={st.End:F2} quick={quick} range={settings.From}-{settings.To}");
         }
 
         // 縮小（近い画素を拾うだけの簡単なもの）
