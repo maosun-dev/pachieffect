@@ -10,27 +10,22 @@ using UnityEngine.UI;
 namespace PachiMoji.EditorTools
 {
     /// <summary>
-    /// アプリ化の手元確認：くり返し再生の時刻の計算と、2つの画面比率での絵（pachieffect/captures/play_*.png）。
+    /// アプリ化の手元確認：iPhone 用の設定・片付け、演出と画面の絵（pachieffect/captures/*.png）。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiAppCheck.Run で動かす（app-check.sh）。
     /// </summary>
     public static class PachiAppCheck
     {
         static int failed;
+        static readonly string[] Words = { "定時", "退社" };
 
         public static void Run()
         {
             failed = 0;
             try
             {
-                // くり返し再生の時刻（開きっぱなしでも壊れないこと）
-                Expect(Mathf.Approximately(PachiPlayer.LoopTime(3f, 10f, 1.5f), 3f), "再生中はそのままの時刻");
-                Expect(Mathf.Approximately(PachiPlayer.LoopTime(10.8f, 10f, 1.5f), 10f), "終わってからの間は終わりの姿で止まる");
-                Expect(Mathf.Approximately(PachiPlayer.LoopTime(11.5f, 10f, 1.5f), 0f), "間が明けたら頭から");
-                Expect(Mathf.Approximately(PachiPlayer.LoopTime(14.5f, 10f, 1.5f), 3f), "2周目も同じ時刻の姿");
-                Expect(PachiPlayer.LoopTime(36000f + 3f, 10f, 1.5f) <= 10f, "10時間開きっぱなしでも終わりを超えない");
-
-                // 再生だけのシーンがあること
-                Expect(File.Exists(Path.Combine(Application.dataPath, "../", PachiBuild.PlayScene)), "シーン " + PachiBuild.PlayScene);
+                // アプリのシーンがあり、PachiApp が載っていること
+                string scenePath = Path.Combine(Application.dataPath, "../", PachiBuild.PlayScene);
+                Expect(File.Exists(scenePath) && File.ReadAllText(scenePath).Contains("m_Name: PachiApp"), "シーン " + PachiBuild.PlayScene + " に PachiApp");
 
                 // iPhone 用の設定（PachiBuild.Configure が当てたもの）
                 Expect(PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.iOS) == PachiBuild.BundleId, "Bundle ID");
@@ -83,7 +78,15 @@ namespace PachiMoji.EditorTools
 
                 // 画面の素材の一覧（コードで描いた絵と、2つの画面用の書体）
                 Expect(UiTheme.Display != null && UiTheme.Body != null, "画面用の書体が読める");
-                ShotUi(720, 1280, Path.Combine(outDir, "ui_parts.png"), null, PartsSheet);
+                ShotUi(720, 1280, Path.Combine(outDir, "ui_parts.png"), PartsSheet);
+
+                // メイン画面：待ち・知らせが出た待ち・終わり（9:16 と 9:19.5）
+                foreach (var (w, h, tag) in new[] { (720, 1280, "9x16"), (720, 1560, "9x19") })
+                {
+                    ShotMain(w, h, Path.Combine(outDir, $"main_{tag}_idle.png"), "定時", "退社", AppState.Idle);
+                    ShotMain(w, h, Path.Combine(outDir, $"main_{tag}_notice.png"), "定時", "退社♨", AppState.Idle);
+                    ShotMain(w, h, Path.Combine(outDir, $"main_{tag}_end.png"), "定時", "退社", AppState.Finished);
+                }
             }
             catch (Exception e)
             {
@@ -138,48 +141,70 @@ namespace PachiMoji.EditorTools
             t.alignment = TextAlignmentOptions.Center;
         }
 
-        /// <summary>
-        /// 画面（uGUI）を1枚に撮る。stage があれば舞台を描いてから、その上に UI カメラで重ねる。
-        /// build は基準 390×844 の Canvas の根っこに部品を並べる。
-        /// </summary>
-        static void ShotUi(int w, int h, string path, Camera stage, Action<RectTransform> build)
+        /// <summary>画面の部品だけを1枚に撮る。build は基準 390×844 の Canvas の根っこに部品を並べる</summary>
+        static void ShotUi(int w, int h, string path, Action<RectTransform> build)
         {
-            if (stage == null) EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-            var uiCam = new GameObject("UiCamera").AddComponent<Camera>();
-            uiCam.orthographic = true;
-            uiCam.clearFlags = stage == null ? CameraClearFlags.SolidColor : CameraClearFlags.Depth;
-            uiCam.backgroundColor = Color.black;
-            uiCam.cullingMask = 1 << 5;   // UI の層だけ
+            var uiCam = MainScreen.CreateUiCamera();
             uiCam.targetTexture = rt;
-            var canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler));
-            canvasGo.layer = 5;
-            var canvas = canvasGo.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceCamera;
-            canvas.worldCamera = uiCam;
-            canvas.planeDistance = 1;
-            var scaler = canvasGo.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = UiTheme.ReferenceSize;
-            scaler.matchWidthOrHeight = 0;
-            build((RectTransform)canvasGo.transform);
-            foreach (var t in canvasGo.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 5;
+            build(MainScreen.CreateCanvas(uiCam));
+            foreach (var tr in UnityEngine.Object.FindObjectsByType<RectTransform>(FindObjectsInactive.Include)) tr.gameObject.layer = MainScreen.UiLayer;
+            RenderUi(rt, path, uiCam);
+        }
+
+        /// <summary>
+        /// メイン画面を1枚に撮る（PachiApp と同じ部品・同じ確かめ方で）。
+        /// 縦長（9:19.5）のときは、ノッチ（上 47pt）とホームバー（下 34pt）を避けた範囲に置く
+        /// </summary>
+        static void ShotMain(int w, int h, string path, string l1, string l2, AppState state)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            float pt = w / UiTheme.ReferenceSize.x;
+            bool notch = h * 9 > w * 17;
+            var safe = notch ? new Rect(0, 34 * pt, w, h - (47 + 34) * pt) : new Rect(0, 0, w, h);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = MainScreen.CreateUiCamera();
+            uiCam.targetTexture = rt;
+            var ui = MainScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h));
+            ui.Line1.text = l1; ui.Line2.text = l2;
+            var font = PachiText.LoadFont("ReggaeOne");
+            var check = InputRules.Check(l1, l2, cp => font.GlyphIndex(cp) != 0);
+            ui.Notice.text = InputRules.Message(check, MainScreen.CanShowInBody(check.BadChar));
+            ui.SetPushEnabled(check.CanPlay);
+            ui.ShowState(state);
+            if (state != AppState.Idle) ui.SetDeckSink(1);
             Canvas.ForceUpdateCanvases();
-            if (stage != null) { stage.targetTexture = rt; stage.Render(); stage.targetTexture = null; }
+
+            var stage = new StageScreen(ui, uiCam);
+            if (check.CanPlay)
+            {
+                stage.Build(check.Lines, new EffectSettings(), new Vector2(w, h));
+                stage.SetFull(state != AppState.Idle);
+                if (state == AppState.Idle) stage.Effect.Idle(1f); else stage.Effect.Evaluate(stage.Effect.Duration);
+                stage.Frame();
+                stage.Effect.Camera.Render();   // アプリでは毎コマ自動で描かれる
+            }
+            RenderUi(rt, path, uiCam);
+            stage.Dispose();
+        }
+
+        // 画面のカメラで板へ描いて保存する
+        static void RenderUi(RenderTexture rt, string path, Camera uiCam)
+        {
+            Canvas.ForceUpdateCanvases();
             uiCam.Render();
             Canvas.ForceUpdateCanvases();
             uiCam.Render();   // 1回目は TMP の字の形が作られる前に描かれることがあるので、もう1回
-            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
             var prev = RenderTexture.active;
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
             RenderTexture.active = rt;
-            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
             tex.Apply();
             RenderTexture.active = prev;
             uiCam.targetTexture = null;
             rt.Release();
             File.WriteAllBytes(path, tex.EncodeToPNG());
-            UnityEngine.Object.DestroyImmediate(canvasGo);
-            UnityEngine.Object.DestroyImmediate(uiCam.gameObject);
             Debug.Log("[PachiAppCheck] 書き出し " + path);
         }
 
@@ -234,7 +259,7 @@ namespace PachiMoji.EditorTools
         static void Shot(int w, int h, string path, EffectSettings settings = null, float t = -1)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var st = PachiStage.Build(PachiPlayer.Words, (float)w / h, settings);
+            var st = PachiStage.Build(Words, (float)w / h, settings);
             st.Evaluate(t >= 0 ? t : st.End - 0.5f);
             Save(st.cam, w, h, path);
         }

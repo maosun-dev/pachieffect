@@ -10,6 +10,7 @@ Shader "PachiMoji/Burst"
         _Mode ("Mode 0=Fire 1=Rainbow 2=Blue", Float) = 0
         _T ("Time", Float) = 0
         _Center ("Center UV", Vector) = (0.5, 0.5, 0, 0)
+        _Aspect ("Quad Aspect", Float) = 0.5625
         _Bolts ("Lightning", Float) = 1
         _Sparks ("Sparks", Float) = 1
         _Core ("Core Glow", Float) = 1
@@ -31,7 +32,7 @@ Shader "PachiMoji/Burst"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 float4 _Center;
-                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain, _Rays, _RayReach;
+                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain, _Rays, _RayReach, _Aspect;
             CBUFFER_END
             struct A { float4 pos : POSITION; float2 uv : TEXCOORD0; };
             struct V { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -115,8 +116,8 @@ Shader "PachiMoji/Burst"
 
             half4 frag(V i) : SV_Target
             {
-                float aspect = _ScreenParams.x / _ScreenParams.y;
-                float2 p = (i.uv - _Center.xy) * float2(aspect, 1);
+                // 板の縦横比で形を決める（舞台を画面の一部に縮めて置いても、丸が丸のまま）
+                float2 p = (i.uv - _Center.xy) * float2(_Aspect, 1);
                 float t = _T;   // 時間はスクリプトから渡す（動画の書き出しでコマがずれないように）
                 float r = length(p);
 

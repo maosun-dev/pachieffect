@@ -52,6 +52,15 @@ namespace PachiMoji.Tests
         }
 
         [Test]
+        public void 書体にない字の場所を入力欄の行と文字の番号で知らせる()
+        {
+            var c = InputRules.Check("", " 退社", cp => cp != '社');   // 1行目が空でも、行は入力欄の番号のまま
+            Assert.AreEqual(2, c.BadLine);
+            Assert.AreEqual(3, c.BadIndex);                             // 先頭の空白も1文字と数える（見たままの位置）
+            Assert.AreEqual("2行目の3文字目は、この書体で出せません。ほかの字にしてください", InputRules.Message(c, false));
+        }
+
+        [Test]
         public void 文はそれぞれ決まったもの()
         {
             Assert.AreEqual("言葉を入れると PUSH できます", InputRules.Message(InputRules.Check("", "", All)));

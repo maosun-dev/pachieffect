@@ -19,6 +19,24 @@ namespace PachiMoji
         public static int For(AppState s) => s == AppState.Playing ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
     }
 
+    /// <summary>
+    /// 舞台の絵を、画面の一部（範囲、0〜1）に縮めて置く投影。
+    /// URP はカメラを重ねるとき後のカメラの描く範囲を変えられないので、舞台のカメラは画面いっぱいに描き、
+    /// 投影のほうで範囲に収める（範囲の外は背景を消した黒のまま）。
+    /// </summary>
+    public static class StageFraming
+    {
+        /// <param name="aspect">範囲の横÷縦（画素で）</param>
+        public static Matrix4x4 Projection(float fovDeg, float aspect, float near, float far, Rect viewport)
+        {
+            var p = Matrix4x4.Perspective(fovDeg, aspect, near, far);
+            // 画面全体（-1〜1）を、範囲の中へ縮めて動かす
+            var m = Matrix4x4.TRS(new Vector3(viewport.center.x * 2 - 1, viewport.center.y * 2 - 1, 0), Quaternion.identity,
+                new Vector3(viewport.width, viewport.height, 1));
+            return m * p;
+        }
+    }
+
     /// <summary>昇格の範囲のメダル（0=銀, 1=金, 2=虹）を指でなぞったときの範囲</summary>
     public static class RangePicker
     {

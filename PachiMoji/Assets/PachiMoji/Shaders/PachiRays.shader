@@ -16,6 +16,7 @@ Shader "PachiMoji/Rays"
         _PScale ("Puchun Flare Scale", Float) = 1
         _PTint ("Puchun Tint", Color) = (0.55, 0.75, 1, 1)
         _PRainbow ("Puchun Rainbow", Float) = 0
+        _Aspect ("Quad Aspect", Float) = 0.5625
     }
     SubShader
     {
@@ -31,10 +32,12 @@ Shader "PachiMoji/Rays"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc, _PScale, _PRainbow;
+                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc, _PScale, _PRainbow, _Aspect;
                 float4 _PTint;
             CBUFFER_END
-            float4 vert(float4 pos : POSITION) : SV_POSITION { return TransformObjectToHClip(pos.xyz); }
+            struct A { float4 pos : POSITION; float2 uv : TEXCOORD0; };
+            struct V { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
+            V vert(A i) { V o; o.pos = TransformObjectToHClip(i.pos.xyz); o.uv = i.uv; return o; }
 
             float hash21(float2 p) { p = frac(p * float2(123.34, 456.21)); p += dot(p, p + 45.32); return frac(p.x * p.y); }
             float vnoise(float2 p)
@@ -57,10 +60,10 @@ Shader "PachiMoji/Rays"
                 return v * lerp(1, k, s);
             }
 
-            half4 frag(float4 sp : SV_Position) : SV_Target
+            half4 frag(V i) : SV_Target
             {
-                float2 uv = sp.xy / _ScreenParams.xy;
-                float2 p = (uv - 0.5) * float2(_ScreenParams.x / _ScreenParams.y, 1);
+                // 板はカメラの見える範囲ちょうど。舞台を画面の一部に縮めて置いても、中心は舞台の中心
+                float2 p = (i.uv - 0.5) * float2(_Aspect, 1);
                 float r = length(p);
                 float a = atan2(p.y, p.x) / 6.2831853 + 0.5;
                 // 筋の並びはゆっくり回る

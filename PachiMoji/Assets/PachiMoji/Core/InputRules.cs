@@ -11,11 +11,13 @@ namespace PachiMoji
         public readonly InputProblem Problem;
         public readonly string[] Lines;
         public readonly string BadChar;   // 書体に無かった最初の1字（MissingGlyph のときだけ）
+        public readonly int BadLine;      // その字がある入力欄の番号（1 か 2）
+        public readonly int BadIndex;     // 入力欄の中で何文字目か（1 から。見たままの位置）
         public bool CanPlay => Problem == InputProblem.None;
 
-        public InputCheck(InputProblem problem, string[] lines, string badChar)
+        public InputCheck(InputProblem problem, string[] lines, string badChar = null, int badLine = 0, int badIndex = 0)
         {
-            Problem = problem; Lines = lines; BadChar = badChar;
+            Problem = problem; Lines = lines; BadChar = badChar; BadLine = badLine; BadIndex = badIndex;
         }
     }
 
@@ -39,23 +41,34 @@ namespace PachiMoji
             foreach (var s in arr)
                 if (Codepoints(s).Count > MaxChars) return new InputCheck(InputProblem.TooLong, arr, null);
 
-            foreach (var s in arr)
-                foreach (int cp in Codepoints(s))
+            // 書体を確かめるのは、入力欄に打ったままの文字列で（場所を見たままの番号で知らせるため）
+            var raws = new[] { line1, line2 };
+            for (int li = 0; li < raws.Length; li++)
+            {
+                var cps = Codepoints(raws[li] ?? "");
+                for (int i = 0; i < cps.Count; i++)
                 {
+                    int cp = cps[i];
                     if (cp <= 0xFFFF && char.IsWhiteSpace((char)cp)) continue;
                     // 0xFFFF を超える字（絵文字など）は、舞台が1文字ずつ切り出せないので断る
                     if (cp > 0xFFFF || !hasGlyph(cp))
-                        return new InputCheck(InputProblem.MissingGlyph, arr, cp > 0xFFFF ? char.ConvertFromUtf32(cp) : ((char)cp).ToString());
+                        return new InputCheck(InputProblem.MissingGlyph, arr,
+                            cp > 0xFFFF ? char.ConvertFromUtf32(cp) : ((char)cp).ToString(), li + 1, i + 1);
                 }
+            }
             return new InputCheck(InputProblem.None, arr, null);
         }
 
-        /// <summary>画面に出す文（問題が無ければ空）</summary>
-        public static string Message(InputCheck c) => c.Problem switch
+        /// <summary>
+        /// 画面に出す文（問題が無ければ空）。showChar が偽なら、出せない字そのものの代わりに場所で知らせる
+        /// （絵文字などは説明文の書体でも出せず、□ になるため）
+        /// </summary>
+        public static string Message(InputCheck c, bool showChar = true) => c.Problem switch
         {
             InputProblem.Empty => "言葉を入れると PUSH できます",
             InputProblem.TooLong => "1行は6文字までです",
-            InputProblem.MissingGlyph => $"「{c.BadChar}」はこの書体で出せません。ほかの字にしてください",
+            InputProblem.MissingGlyph when showChar => $"「{c.BadChar}」はこの書体で出せません。ほかの字にしてください",
+            InputProblem.MissingGlyph => $"{c.BadLine}行目の{c.BadIndex}文字目は、この書体で出せません。ほかの字にしてください",
             _ => "",
         };
 

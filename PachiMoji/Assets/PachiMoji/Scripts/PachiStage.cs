@@ -57,7 +57,8 @@ namespace PachiMoji
         public bool SparksOn = true;
         EffectSettings settings;
         PachiText.Finish land;   // ドンで着地するときの色（昇格のはじまりの色）
-        Transform bg; float aspect;
+        Transform bg, flashQuad, raysQuad; float aspect;
+        const float IdleAspect = 2.2f;   // 待ちの姿の背景の板の横÷縦（入力の板より上の、横長の範囲を覆う）
         const float BgDist = 60;
         int teaseCount;
         float[] teaseAt, teaseLen;   // チラ見せ1文字ずつの始まりと長さ（だんだん短く＝速くなる）
@@ -153,6 +154,7 @@ namespace PachiMoji
             fl.transform.SetParent(camGo.transform, false);
             fl.transform.localPosition = new Vector3(0, 0, 0.2f);
             fl.transform.localScale = new Vector3(2, 2, 1);
+            st.flashQuad = fl.transform;
             st.flashMat = new Material(Shader.Find("PachiMoji/Flash"));
             fl.GetComponent<MeshRenderer>().sharedMaterial = st.flashMat;
 
@@ -163,9 +165,12 @@ namespace PachiMoji
             rq.transform.SetParent(camGo.transform, false);
             rq.transform.localPosition = new Vector3(0, 0, 0.21f);
             rq.transform.localScale = new Vector3(2, 2, 1);
+            st.raysQuad = rq.transform;
             st.raysMat = new Material(Shader.Find("PachiMoji/Rays"));
             st.raysMat.SetColor("_PTint", LightTint(settings.Light));
             st.raysMat.SetFloat("_PRainbow", settings.Light == LightColor.Rainbow ? 1 : 0);
+            st.raysMat.SetFloat("_Aspect", aspect);
+            st.bgMat.SetFloat("_Aspect", aspect);
             rq.GetComponent<MeshRenderer>().sharedMaterial = st.raysMat;
 
             // 光のにじみ（ブルーム）
@@ -241,8 +246,11 @@ namespace PachiMoji
             tr.position = camBasePos + Vector3.up * (Mathf.Sin(t * 0.9f) * 0.01f);
             tr.rotation = camBaseRot;
             cam.fieldOfView = BaseFov;
+            // 待ちは舞台が横長の範囲に置かれるので、背景の板も横長にして覆う
             float bh = 2 * BgDist * Mathf.Tan(BaseFov * 0.5f * Mathf.Deg2Rad) * 1.04f;
-            bg.localScale = new Vector3(bh * aspect, bh, 1);
+            bg.localScale = new Vector3(bh * IdleAspect, bh, 1);
+            bgMat.SetFloat("_Aspect", IdleAspect);
+            FitQuads(BaseFov);
             sparks.Evaluate(-1, tr);
 
             bgMat.SetFloat("_T", t);
@@ -259,6 +267,14 @@ namespace PachiMoji
             raysMat.SetFloat("_PDot", 0);
             raysMat.SetFloat("_PArc", 0);
             flashMat.SetColor("_Color", new Color(0, 0, 0, 0));
+        }
+
+        // 閃光・光の筋の板を、カメラの見える範囲ちょうど（少しだけ大きめ）にする
+        void FitQuads(float fov)
+        {
+            float h = 2 * 0.2f * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * 1.02f;
+            flashQuad.localScale = new Vector3(h * aspect, h, 1);
+            raysQuad.localScale = new Vector3(h * aspect * 0.21f / 0.2f, h * 0.21f / 0.2f, 1);
         }
 
         static PachiText.Finish FinishOf(Tier t) =>
@@ -554,6 +570,8 @@ namespace PachiMoji
             // 背景の板は画面ぴったりに（大きすぎると、白く光る中心だけが拡大されて映る）
             float bh = 2 * BgDist * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * 1.04f;
             bg.localScale = new Vector3(bh * aspect, bh, 1);
+            bgMat.SetFloat("_Aspect", aspect);
+            FitQuads(fov);
 
             bgMat.SetFloat("_T", bt);
             bgMat.SetFloat("_Mode", bgMode);

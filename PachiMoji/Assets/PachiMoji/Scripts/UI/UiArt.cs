@@ -148,6 +148,20 @@ namespace PachiMoji
             return ToSprite(px, W, H, new Vector4(16, 0, 16, 0));
         });
 
+        /// <summary>下から上へ、黒が消えていくぼかし（明るい絵の上で文字を読めるようにする）</summary>
+        public static Sprite Scrim() => Cached("scrim", () =>
+        {
+            const int W = 4, H = 64;
+            var px = new Color[W * H];
+            for (int y = 0; y < H; y++)
+            {
+                float v = (y + 0.5f) / H;   // 下 0 → 上 1
+                var c = new Color(0, 0, 0, 0.85f * (1 - Mathf.SmoothStep(0, 1, v)));
+                for (int x = 0; x < W; x++) px[y * W + x] = c;
+            }
+            return ToSprite(px, W, H, Vector4.zero);
+        });
+
         // クロムの色。u＝縁の断面の位置（0 外 → 1 内）、ny＝上下（上 +1）、gain＝明るさ
         static Color ChromeAt(float u, float ny, float gain)
         {

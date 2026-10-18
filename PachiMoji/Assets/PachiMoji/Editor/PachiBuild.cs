@@ -12,7 +12,7 @@ namespace PachiMoji.EditorTools
     /// <summary>
     /// アプリの組み立てまわり：再生だけのシーン・仮のアイコン・iPhone 用の設定・組み立ての入口。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiBuild.○○ で動かす。
-    ///   MakePlayScene … 再生だけのシーンを作る
+    ///   MakePlayScene … アプリのシーンを作る（PachiApp を1つ置くだけ）
     ///   MakeIcon      … 仮のアイコンを作る（本物は順番5で作る）
     ///   ConfigureCli  … iPhone 用の設定を当てる（手元用）
     ///   BuildIos      … GitHub の組み立て機（GameCI）から呼ばれる。設定を当てて Xcode の作りを書き出す
@@ -28,13 +28,13 @@ namespace PachiMoji.EditorTools
             { "PachiMoji/Burst", "PachiMoji/Flash", "PachiMoji/Glint", "PachiMoji/Metal", "PachiMoji/Rays", "PachiMoji/Spark" };
         const string GraphicsSettingsPath = "ProjectSettings/GraphicsSettings.asset";
 
-        /// <summary>PachiPlayer だけが載ったシーンを作る（カメラ・ライトは置かない。舞台は PachiStage が作る）</summary>
+        /// <summary>PachiApp だけが載ったシーンを作る（カメラ・ライト・画面の部品は置かない。どれも PachiApp がコードで作る）</summary>
         public static void MakePlayScene()
         {
             RunCli(() =>
             {
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                new GameObject("PachiPlayer").AddComponent<PachiPlayer>();
+                new GameObject("PachiApp").AddComponent<PachiApp>();
                 if (!EditorSceneManager.SaveScene(scene, PlayScene)) throw new Exception("シーンを保存できない: " + PlayScene);
                 Debug.Log("[PachiBuild] シーンを作った " + PlayScene);
             });
