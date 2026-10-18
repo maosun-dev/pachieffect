@@ -1,0 +1,162 @@
+# iPhone版を GitHub の組み立て機だけで作って、TestFlight に送る。
+#   1. Linux 機：GameCI（無料の道具）で Unity から Xcode の作りを作る
+#   2. Mac 機：Xcode で仕上げて TestFlight に送る（testflight をオフにすると 1 だけ）
+# GitHub のリポジトリの「Actions」タブ →「iPhone版をTestFlightへ」→「Run workflow」で動く。
+# 手順の詳しいことは docs/ios-build.md。
+#
+# 必要な Secrets（Settings → Secrets and variables → Actions）:
+#   UNITY_LICENSE              Unity_lic.ulf の中身（全文）
+#   UNITY_EMAIL                Unity アカウントのメールアドレス
+#   UNITY_PASSWORD             Unity アカウントのパスワード
+#   APPLE_TEAM_ID              Appleのチーム ID（10文字）
+#   APPSTORE_API_KEY_ID        App Store Connect API キーの Key ID
+#   APPSTORE_API_ISSUER_ID     App Store Connect API キーの Issuer ID
+#   APPSTORE_API_PRIVATE_KEY   ダウンロードした AuthKey_XXXX.p8 の中身（全文）
+name: iPhone版をTestFlightへ
+
+on:
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: 'TestFlight まで送る（オフなら Unity で Xcode の作りを作るところまで）'
+        type: boolean
+        default: true
+      runner:
+        description: '仕上げに使う Mac（新しいチップの Mac は混んでいて始まらないことがある）'
+        type: choice
+        options: [macos-15-intel, macos-latest]
+        default: macos-15-intel
+
+permissions:
+  contents: read
+
+jobs:
+  unity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # Unity の組み立て環境が大きいので、使わない道具を消して空きを作る
+      - uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      # Unity の読み込み済みの中身（Library）を取っておき、2回目から速くする
+      - uses: actions/cache@v4
+        with:
+          path: PachiMoji/Library
+          key: Library-iOS-${{ hashFiles('PachiMoji/Assets/**', 'PachiMoji/Packages/**', 'PachiMoji/ProjectSettings/**') }}
+          restore-keys: Library-iOS-
+
+      - name: Unity で Xcode の作りを作る
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: PachiMoji
+          targetPlatform: iOS
+          buildMethod: PachiMoji.EditorTools.PachiBuild.BuildIos
+          versioning: None
+
+      # そのまま渡すと実行の許可（シェルの印）が消えて Xcode の手順が動かないので、固めて渡す
+      - name: Xcode の作りを固める
+        run: sudo tar -czf xcode-project.tgz -C build/iOS iOS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xcode-project
+          path: xcode-project.tgz
+          retention-days: 1
+
+  testflight:
+    needs: unity
+    if: ${{ inputs.testflight }}
+    runs-on: ${{ inputs.runner || 'macos-15-intel' }}
+    timeout-minutes: 90
+    env:
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+      ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: xcode-project
+
+      - name: Xcode の作りを広げる
+        run: tar -xzf xcode-project.tgz
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: App Store Connect の鍵を置く
+        env:
+          PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
+          echo "KEY_PATH=$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8" >> "$GITHUB_ENV"
+
+      # 組み立て番号：やり直し（Re-run）でも重ならないよう「実行番号×100＋やり直し回数」にする
+      # 暗号の申告：特別な暗号は使っていないと書いておき、毎回聞かれないようにする
+      - name: 番号と申告を書き込む
+        run: |
+          BUILD=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
+          PLIST=iOS/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :ITSAppUsesNonExemptEncryption" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST"
+          echo "組み立て番号 $BUILD"
+
+      # ここでは署名しない（署名すると開発用の証明書が要り、それには iPhone の登録が要る）。
+      # 配布用の署名は次の「TestFlight に送る」で付ける。
+      - name: アプリを組み立てる（archive）
+        run: |
+          xcodebuild archive \
+            -project iOS/Unity-iPhone.xcodeproj \
+            -scheme Unity-iPhone \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGNING_ALLOWED=NO \
+            CURRENT_PROJECT_VERSION="$BUILD"
+          # アプリの名前が日本語なので、入れ物（○○.app）の名前は決め打ちせずに探す
+          APP=$(ls -d "$RUNNER_TEMP/App.xcarchive/Products/Applications/"*.app)
+          # 署名なしの部品は送るときに署名し直されないので、仮の署名を付けておく（送るときに配布用に置き換わる）
+          find "$APP/Frameworks" -maxdepth 1 -name '*.framework' \
+            -exec codesign --force --sign - --timestamp=none {} \;
+          codesign --force --sign - --timestamp=none "$APP"
+
+      - name: TestFlight に送る
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID"
+
+      - name: 鍵を消す
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
