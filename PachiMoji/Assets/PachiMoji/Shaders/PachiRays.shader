@@ -1,5 +1,6 @@
 // 光の放射：画面の中心から吹き出す、虹色がかった細い光の筋。カメラの目の前の板に足し算で重ねる
 // （チラ見せの超アップでは文字が画面いっぱいで背景が映らないので、手前に重ねて「文字の裏から光が漏れる」ように見せる）
+// あわせて、切り裂き（画面を斜めに横切る紫の光線）もここで描く
 Shader "PachiMoji/Rays"
 {
     Properties
@@ -7,6 +8,8 @@ Shader "PachiMoji/Rays"
         _Rays ("Strength", Float) = 0
         _RayReach ("Reach", Float) = 2
         _T ("Time", Float) = 0
+        _Slash ("Slash Strength", Float) = 0
+        _SlashProg ("Slash Progress", Float) = 0
     }
     SubShader
     {
@@ -22,7 +25,7 @@ Shader "PachiMoji/Rays"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float _Rays, _RayReach, _T;
+                float _Rays, _RayReach, _T, _Slash, _SlashProg;
             CBUFFER_END
             float4 vert(float4 pos : POSITION) : SV_POSITION { return TransformObjectToHClip(pos.xyz); }
 
@@ -52,7 +55,25 @@ Shader "PachiMoji/Rays"
                 float3 c = lerp(float3(1.0, 0.95, 0.85), prism, 0.55) * ray;
                 // 中心のにじみ
                 c += float3(1.0, 0.9, 0.7) * exp(-r * 4) * 0.5;
-                return half4(c * _Rays, 1);
+                c *= _Rays;
+
+                // 切り裂き：左下から右上へ少し傾いた光線。_SlashProg（0〜1）で左から伸びる
+                if (_Slash > 0)
+                {
+                    float2 dirS = normalize(float2(1, 0.22));
+                    float2 nS = float2(-dirS.y, dirS.x);
+                    float along = dot(p, dirS), across = dot(p, nS);
+                    float head = lerp(-1.2, 1.2, _SlashProg);
+                    float m = smoothstep(head, head - 0.08, along);
+                    // ゆらぐ太さ（ジジジと震える）
+                    float wob = 1 + 0.25 * sin(along * 40 + _T * 60) * sin(_T * 37);
+                    float d = abs(across) / wob;
+                    float3 beam = float3(1, 0.9, 1) * exp(-d * 260) * 2.5
+                                + float3(0.95, 0.15, 1.0) * exp(-d * 40) * 1.6
+                                + float3(0.6, 0.05, 0.9) * exp(-d * 9) * 0.5;
+                    c += beam * m * _Slash;
+                }
+                return half4(c, 1);
             }
             ENDHLSL
         }

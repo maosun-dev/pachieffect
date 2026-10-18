@@ -3,7 +3,7 @@
 // 2) その明るさを、波打つ色の対応表（_Ramp）に通して金・銀・黒などにする
 // 3) 一番明るいところは 1 を超える明るさにして、光のにじみ（ブルーム）を起こす
 // 4) 格上げ：もう1組の色（_RampB／_RainbowB）を持ち、文字の左から _WipeX まで塗り替える
-// 5) 昇格の瞬間：_White で全体を白く飛ばす。_HueShift で虹の色を流す
+// 5) 昇格の瞬間：_White で全体を白く飛ばす。_HueShift で虹の色を流す。_Gray で色を抜いて灰色に固める（切り裂かれたあとのタメ）
 Shader "PachiMoji/Metal"
 {
     Properties
@@ -24,6 +24,7 @@ Shader "PachiMoji/Metal"
         _WipeGlow ("Wipe Glow", Float) = 0
         _White ("White Hot", Float) = 0
         _HueShift ("Hue Shift", Float) = 0
+        _Gray ("Gray", Float) = 0
     }
     SubShader
     {
@@ -44,7 +45,7 @@ Shader "PachiMoji/Metal"
                 float4 _Ramp_ST;
                 float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness, _BackFade;
                 float4 _RampB_ST;
-                float _RainbowB, _WipeX, _WipeGlow, _White, _HueShift;
+                float _RainbowB, _WipeX, _WipeGlow, _White, _HueShift, _Gray;
             CBUFFER_END
 
             struct A { float4 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
@@ -116,6 +117,9 @@ Shader "PachiMoji/Metal"
                 }
                 // 白く飛ぶ：色を抜いて、明暗の形だけ残した白熱の白にする
                 c = lerp(c, float3(1.0, 0.97, 0.9) * (0.55 + 1.3 * L), _White);
+                // 灰色に固める：色を抜いて沈める（少し紫がかった灰）
+                float lum = dot(c, float3(0.3, 0.55, 0.15));
+                c = lerp(c, float3(0.5, 0.48, 0.56) * (0.15 + 0.9 * lum), _Gray);
                 // 塗り替えの境目に光の帯
                 c += float3(1.0, 0.95, 0.8) * exp(-abs(i.ox - _WipeX) * 18) * _WipeGlow;
                 c *= _Brightness;
