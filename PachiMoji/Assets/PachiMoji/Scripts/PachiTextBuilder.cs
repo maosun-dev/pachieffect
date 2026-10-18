@@ -70,21 +70,25 @@ namespace PachiMoji
 
         // ───────── 文字の並びから輪郭を作る ─────────
 
-        public static PathsD LayoutOutline(TtfFont font, IList<string> lines, Style style, int curveSegs = 6)
+        public static PathsD LayoutOutline(TtfFont font, IList<string> lines, Style style, int curveSegs = 6, List<Vector2> charCenters = null)
         {
             float k = 1000f / font.UnitsPerEm;
             var all = new PathsD();
             float lineH = 1000 + style.lineGap;
             var lineWidths = new List<float>();
             var perLine = new List<PathsD>();
+            var charX = new List<List<float>>();
             foreach (var line in lines)
             {
                 var lp = new PathsD();
+                var lineChars = new List<float>();
+                charX.Add(lineChars);
                 float x = 0;
                 int count = 0;
                 foreach (int cp in Codepoints(line))
                 {
                     int g = font.GlyphIndex(cp);
+                    lineChars.Add(x + font.Advance(g) * k * 0.5f);
                     foreach (var contour in font.Outline(g, curveSegs))
                     {
                         var path = new PathD(contour.Count);
@@ -105,6 +109,8 @@ namespace PachiMoji
             {
                 float ox = -lineWidths[i] * 0.5f;
                 float oy = totalH * 0.5f - lineH * i - 500 - baseCenter + 0;
+                if (charCenters != null)
+                    foreach (var cx in charX[i]) charCenters.Add(new Vector2(cx + ox, oy + baseCenter));
                 foreach (var path in perLine[i])
                 {
                     var moved = new PathD(path.Count);

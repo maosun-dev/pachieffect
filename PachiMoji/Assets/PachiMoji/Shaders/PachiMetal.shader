@@ -2,6 +2,7 @@
 // 1) 面の向きから「スタジオの映り込み」の明るさを出す（明るい空／暗い水平線／茶色い地面＋縦の光の帯）
 // 2) その明るさを、波打つ色の対応表（_Ramp）に通して金・銀・黒などにする
 // 3) 一番明るいところは 1 を超える明るさにして、光のにじみ（ブルーム）を起こす
+// 4) 格上げ：もう1組の色（_RampB／_RainbowB）を持ち、文字の左から _WipeX まで塗り替える
 Shader "PachiMoji/Metal"
 {
     Properties
@@ -16,6 +17,10 @@ Shader "PachiMoji/Metal"
         _Diffuse ("Facet Diffuse", Float) = 0.2
         _Brightness ("Brightness", Float) = 1
         _BackFade ("Back Fade", Float) = 0.3
+        _RampB ("Ramp B", 2D) = "white" {}
+        _RainbowB ("Rainbow B (0/1)", Float) = 0
+        _WipeX ("Wipe X (object)", Float) = -100000
+        _WipeGlow ("Wipe Glow", Float) = 0
     }
     SubShader
     {
@@ -31,13 +36,16 @@ Shader "PachiMoji/Metal"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             TEXTURE2D(_Ramp); SAMPLER(sampler_Ramp);
+            TEXTURE2D(_RampB); SAMPLER(sampler_RampB);
             CBUFFER_START(UnityPerMaterial)
                 float4 _Ramp_ST;
                 float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness, _BackFade;
+                float4 _RampB_ST;
+                float _RainbowB, _WipeX, _WipeGlow;
             CBUFFER_END
 
             struct A { float4 pos : POSITION; float3 nrm : NORMAL; float2 uv : TEXCOORD0; };
-            struct V { float4 pos : SV_POSITION; float3 wn : TEXCOORD0; float3 wp : TEXCOORD1; float2 uv : TEXCOORD2; };
+            struct V { float4 pos : SV_POSITION; float3 wn : TEXCOORD0; float3 wp : TEXCOORD1; float2 uv : TEXCOORD2; float ox : TEXCOORD3; };
 
             V vert(A i)
             {
@@ -46,6 +54,7 @@ Shader "PachiMoji/Metal"
                 o.pos = TransformWorldToHClip(o.wp);
                 o.wn = TransformObjectToWorldNormal(i.nrm);
                 o.uv = i.uv;
+                o.ox = i.pos.x;
                 return o;
             }
 
@@ -87,8 +96,10 @@ Shader "PachiMoji/Metal"
                 float lam = saturate(dot(n, normalize(float3(-0.45, 0.75, -0.5))));
                 float L = saturate(e * (1 - _Diffuse) + lam * _Diffuse);
 
+                // 格上げの塗り替え：左から _WipeX までは B の色
+                bool useB = i.ox < _WipeX;
                 float3 c;
-                if (_Rainbow > 0.5)
+                if ((useB ? _RainbowB : _Rainbow) > 0.5)
                 {
                     float hue = frac(i.wp.x * _HueScale + i.wp.y * 0.08);
                     float3 base = hsv2rgb(hue, 0.9, 1);
@@ -97,8 +108,11 @@ Shader "PachiMoji/Metal"
                 }
                 else
                 {
-                    c = SAMPLE_TEXTURE2D(_Ramp, sampler_Ramp, float2(L, 0.5)).rgb;
+                    c = useB ? SAMPLE_TEXTURE2D(_RampB, sampler_RampB, float2(L, 0.5)).rgb
+                             : SAMPLE_TEXTURE2D(_Ramp, sampler_Ramp, float2(L, 0.5)).rgb;
                 }
+                // 塗り替えの境目に光の帯
+                c += float3(1.0, 0.95, 0.8) * exp(-abs(i.ox - _WipeX) * 18) * _WipeGlow;
                 c *= _Brightness;
                 // 側面は奥へ行くほど暗く沈める（塊の重さが出る）
                 c *= lerp(1, _BackFade, i.uv.y);

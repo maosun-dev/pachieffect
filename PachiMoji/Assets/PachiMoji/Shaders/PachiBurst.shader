@@ -14,6 +14,7 @@ Shader "PachiMoji/Burst"
         _Sparks ("Sparks", Float) = 1
         _Core ("Core Glow", Float) = 1
         _Aberration ("Chromatic Aberration", Float) = 0.012
+        _Gain ("Gain", Float) = 1
     }
     SubShader
     {
@@ -28,7 +29,7 @@ Shader "PachiMoji/Burst"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 float4 _Center;
-                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration;
+                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain;
             CBUFFER_END
             struct A { float4 pos : POSITION; float2 uv : TEXCOORD0; };
             struct V { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -114,7 +115,7 @@ Shader "PachiMoji/Burst"
             {
                 float aspect = _ScreenParams.x / _ScreenParams.y;
                 float2 p = (i.uv - _Center.xy) * float2(aspect, 1);
-                float t = _T + _Time.y;
+                float t = _T;   // 時間はスクリプトから渡す（動画の書き出しでコマがずれないように）
                 float r = length(p);
 
                 // 色ずれ：R・G・B を中心から少しずつずらした位置で取る
@@ -169,7 +170,7 @@ Shader "PachiMoji/Burst"
 
                 // まわりを少し暗く
                 c *= lerp(1.0, 0.6, saturate(r * 0.8 - 0.35));
-                return half4(c, 1);
+                return half4(c * _Gain, 1);
             }
             ENDHLSL
         }

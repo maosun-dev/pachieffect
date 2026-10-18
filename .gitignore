@@ -1,3 +1,5 @@
 captures/unity.log
 .claude/scheduled_tasks.lock
 captures/compare_kakutei.png
+captures/*.mp4
+captures/movie_*_sheet.png
