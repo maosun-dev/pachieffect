@@ -29,13 +29,16 @@ namespace PachiMoji
         public const float GrayHold = 1.2f;     // 切り裂かれて灰色に固まったままタメる長さ
         public const float Spin = 0.7f;         // 虹になったあとの1回転の長さ
         public const float SpinRest = 0.45f;    // 1回転と1回転のあいだに止まる長さ
+        public const float HitStop = 0.1f;      // ドンの瞬間に全体を止める長さ（ヒットストップ）
+        const float Punch = 7;                  // ドンの瞬間にカメラがぐっと寄る量（画角を何度せまくするか）
 
         public float TeaseStart => Rumble + Tame;
         public float RayStart { get; private set; }   // チラ見せの長さは文字数で変わるので Build で決める
         public float FlashStart => RayStart + RayLen;
         public float SlamStart => FlashStart + 0.14f;
         public float Impact => SlamStart + 0.2f;
-        public float GoldAt => Impact + 1.3f;          // 白飛びの始まり。色が切り替わるのは +WhiteGold
+        public float ImpactEnd => Impact + HitStop;   // 止まっていた時間が動き出す時刻
+        public float GoldAt => ImpactEnd + 1.3f;          // 白飛びの始まり。色が切り替わるのは +WhiteGold
         public float SlashAt => GoldAt + WhiteGold + 1.7f;              // 金のあと、切り裂かれる
         public float RainbowAt => SlashAt + SlashDraw + GrayHold;       // 灰色のタメのあと、一気に虹
         public float End => RainbowAt + 2 * Spin + SpinRest + 1.8f;
@@ -45,6 +48,7 @@ namespace PachiMoji
         public Transform text;
         public PachiText.Rig rig;
         Material bgMat, flashMat, raysMat;
+        PachiShards shards;   // ドンで飛び散る破片
         Transform bg; float aspect;
         const float BgDist = 60;
         int teaseCount;
@@ -98,6 +102,12 @@ namespace PachiMoji
                 st.teaseObj[k] = one;
             }
             var b = go.GetComponent<MeshRenderer>().bounds;
+
+            // ドンで飛び散る破片：銀の表の面・銀のフチ・白く焼けたもの
+            var sm = PachiText.Materials(PachiText.Finish.Silver);
+            var hot = PachiText.Materials(PachiText.Finish.Silver)[0];
+            hot.SetFloat("_White", 0.75f);
+            st.shards = PachiShards.Build(b.center, b.size, new[] { sm[0], hot, sm[3], hot }, 72, StableHash(string.Concat(lines)) + 1);
 
             // カメラ
             var camGo = new GameObject("Camera");
@@ -233,6 +243,10 @@ namespace PachiMoji
             float glint = 0;
             float slash = 0, slashProg = 0, gray = 0;
             float pFlash = 0, pDot = 0, pArc = 0, pScale = 1;   // プチュンの閃光・フレア・電気・フレアの大きさ
+            // ヒットストップのあいだは背景の動きも止める。動き出したら止まっていた分だけ遅らせる
+            bool stop = t >= Impact && t < ImpactEnd;
+            float bt = t < Impact ? t : stop ? Impact : t - HitStop;
+            float shardT = t < Impact ? -1 : stop ? 0.02f : t - ImpactEnd + 0.02f;
 
             if (t < Rumble)
             {
@@ -305,11 +319,12 @@ namespace PachiMoji
                     float k = (t - SlamStart) / (Impact - SlamStart);
                     scale = Mathf.Lerp(3.5f, 1f, k * k);
                     flash = new Color(1, 1, 1, 1 - k * 0.75f);
+                    fov = BaseFov - 2.5f * k;   // 飛んでくるあいだに少しずつ寄る
                 }
                 else
                 {
                     // 余韻：ゆっくり揺れて、少しずつ寄る。切り裂かれたら止まる。虹のあとは回転してから揺れ直す
-                    float h = rain ? Mathf.Max(0, rx - 2 * Spin - SpinRest) : Mathf.Min(t, SlashAt) - Impact;
+                    float h = rain ? Mathf.Max(0, rx - 2 * Spin - SpinRest) : Mathf.Max(0, Mathf.Min(t, SlashAt) - ImpactEnd);
                     float spin = 0;
                     if (rain)
                     {
@@ -317,7 +332,10 @@ namespace PachiMoji
                         spin = 360 * (1 - Mathf.Pow(1 - e1, 3)) + 360 * (1 - Mathf.Pow(1 - e2, 3));   // 1回転 → 止まる → 1回転
                     }
                     rot = textBaseRot * Quaternion.Euler(0, Mathf.Sin(h * 0.7f) * 4 + spin, 0);
-                    float hc = Mathf.Min(t, SlashAt) - Impact;
+                    float hc = Mathf.Max(0, Mathf.Min(t, SlashAt) - ImpactEnd);
+                    // ドンでぐっと寄って、すぐ元の距離に戻る（少し行き過ぎてから落ち着く）
+                    float px = Mathf.Max(0, t - ImpactEnd);
+                    fov = BaseFov - Punch * Mathf.Exp(-px * 7) * Mathf.Cos(px * 6);
                     camPos = Vector3.Lerp(camBasePos, text.position, Mathf.Min(0.06f, hc * 0.012f));
                     glint = cut ? 0 : 1;
                 }
@@ -350,13 +368,25 @@ namespace PachiMoji
                 fgRays = pop * (rain ? 0.6f : 0.35f); fgReach = 2.4f;
 
                 // ドン・切り替えの瞬間：白く光って、揺れる
-                float f1 = Decay(t, Impact, 5);
+                float f1 = 0.75f * Decay(t, ImpactEnd, 5);
                 float fa = Mathf.Max(f1, (rain ? 0.9f : 0.7f) * ((rain || g.snapped) ? Mathf.Exp(-since * 12) : 0));
-                if (t >= Impact) flash = fin == PachiText.Finish.Silver ? new Color(1, 1, 1, fa) : new Color(1, 0.95f, 0.8f, fa);
+                if (t >= ImpactEnd) flash = fin == PachiText.Finish.Silver ? new Color(1, 1, 1, fa) : new Color(1, 0.95f, 0.8f, fa);
                 // 前ぶれ：画面全体をふっと暗くする
                 if (pre > 0 && fa < 0.05f) flash = new Color(0, 0, 0, 0.45f * pre);
-                shake = Decay(t, Impact, 6) * 0.07f + pop * (rain ? 0.1f : 0.08f) + pre * 0.012f;
-                bgGain = t < Impact ? 0.7f : Mathf.Lerp(1f, 0.15f, Mathf.Max(pre, g.white > 0 ? 1 : 0)) + 0.4f * pop;
+                shake = Decay(t, ImpactEnd, 6) * 0.07f + pop * (rain ? 0.1f : 0.08f) + pre * 0.012f;
+                bgGain = t < ImpactEnd ? 0.7f : Mathf.Lerp(1f, 0.15f, Mathf.Max(pre, g.white > 0 ? 1 : 0)) + 0.4f * pop;
+
+                if (stop)
+                {
+                    // ヒットストップ：文字が着地した形のまま、全部が一瞬止まる。白く焼けて、カメラはいちばん寄った位置
+                    scale = 1.05f;
+                    rot = textBaseRot;
+                    fov = BaseFov - Punch;
+                    flash = new Color(1, 1, 1, 0.08f);
+                    white = 0.3f;
+                    shake = 0;
+                    bgGain = 1.4f; bgRays = 1.2f; fgRays = 0;   // 手前の光は消して、止まった文字をくっきり見せる
+                }
 
                 if (cut)
                 {
@@ -403,6 +433,8 @@ namespace PachiMoji
                 g.sharedMaterial.SetFloat("_Intensity", (i == 0 ? 7f : 4f) * tw);
             }
 
+            shards.Evaluate(shardT);
+
             // 揺れ（時刻から決まる乱数で）
             var sh = new Vector3(Hash(t * 31.7f) - 0.5f, Hash(t * 17.3f + 4) - 0.5f, 0) * 2 * shake;
             tr.position = camPos + camRot * sh;
@@ -412,7 +444,7 @@ namespace PachiMoji
             float bh = 2 * BgDist * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * 1.04f;
             bg.localScale = new Vector3(bh * aspect, bh, 1);
 
-            bgMat.SetFloat("_T", t);
+            bgMat.SetFloat("_T", bt);
             bgMat.SetFloat("_Mode", bgMode);
             bgMat.SetFloat("_Gain", bgGain);
             bgMat.SetFloat("_Core", bgCore);
@@ -422,7 +454,7 @@ namespace PachiMoji
             bgMat.SetFloat("_RayReach", bgReach);
             raysMat.SetFloat("_Rays", fgRays);
             raysMat.SetFloat("_RayReach", fgReach);
-            raysMat.SetFloat("_T", t);
+            raysMat.SetFloat("_T", bt);
             raysMat.SetFloat("_Slash", slash);
             raysMat.SetFloat("_SlashProg", slashProg);
             raysMat.SetFloat("_PFlash", pFlash);
