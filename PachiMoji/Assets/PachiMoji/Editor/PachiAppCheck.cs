@@ -39,6 +39,11 @@ namespace PachiMoji.EditorTools
                 foreach (var s in PachiBuild.Shaders) Expect(PachiBuild.AlwaysIncluded(s), "いつも入れるシェーダー: " + s);
                 var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(PachiBuild.IconPath);
                 Expect(icon != null && icon.width == 1024 && icon.height == 1024, "アイコン 1024 四方");
+                // CreatePrimitive(Quad) が付ける MeshCollider を、iPhone 版の「使わない部品を削る」から守る
+                var linkXml = Path.Combine(Application.dataPath, "link.xml");
+                Expect(File.Exists(linkXml) && File.ReadAllText(linkXml).Contains("UnityEngine.MeshCollider"), "link.xml で MeshCollider を残す");
+                // iPhone は Mobile の画質で動く。0.8 倍で描いて引き伸ばすと金の縁がぼやけるので 1 倍
+                Expect(Mathf.Approximately(PachiBuild.MobilePipeline().renderScale, 1f), "Mobile の描く細かさが 1 倍");
 
                 // 2つの画面比率の絵（iPhone SE の 9:16 と、ノッチのある機種の 9:19.5）
                 string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../captures"));

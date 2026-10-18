@@ -5,6 +5,7 @@ using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 
 namespace PachiMoji.EditorTools
 {
@@ -97,9 +98,25 @@ namespace PachiMoji.EditorTools
                 gs.ApplyModifiedPropertiesWithoutUndo();
             }
 
+            // iPhone は Mobile の画質で動く。0.8 倍で描いて引き伸ばすと金の縁がぼやけるので 1 倍にする（描くものは軽い）
+            var mobile = MobilePipeline();
+            if (!Mathf.Approximately(mobile.renderScale, 1f))
+            {
+                mobile.renderScale = 1f;
+                EditorUtility.SetDirty(mobile);
+            }
+
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(PlayScene, true) };
             AssetDatabase.SaveAssets();
             Debug.Log("[PachiBuild] iPhone 用の設定を当てた");
+        }
+
+        /// <summary>iPhone が使う画質（Mobile）の描画設定</summary>
+        public static UniversalRenderPipelineAsset MobilePipeline()
+        {
+            int i = Array.IndexOf(QualitySettings.names, "Mobile");
+            if (i < 0) throw new Exception("画質 Mobile が無い");
+            return (UniversalRenderPipelineAsset)QualitySettings.GetRenderPipelineAssetAt(i);
         }
 
         /// <summary>そのシェーダーが「いつも入れるシェーダー」に入っているか</summary>

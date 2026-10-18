@@ -1,0 +1,10 @@
+<!--
+  iPhone 版の「使わない部品を削る」から守るもの。
+  GameObject.CreatePrimitive(Quad) は内部で MeshCollider を付けるが、コードからは名前で触っていないので、
+  削られるとアプリが起動直後に落ちることがある。
+-->
+<linker>
+  <assembly fullname="UnityEngine.PhysicsModule">
+    <type fullname="UnityEngine.MeshCollider" preserve="all"/>
+  </assembly>
+</linker>
