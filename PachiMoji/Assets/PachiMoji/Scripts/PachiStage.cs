@@ -11,7 +11,7 @@ namespace PachiMoji
     /// 動画の書き出しでも、アプリで再生しても、同じ時刻なら同じ絵になる。
     ///
     /// 流れ（参考動画の調査より）：
-    ///   うなり（赤くにじむ）→ 暗転・無音 → チラ見せ（1文字ずつ、立体を回り込んで映す。あいだに暗転、だんだん速く）
+    ///   プチュン（テレビを切ったように画面が線→点になって消える）→ 暗転・無音 → チラ見せ（1文字ずつ、立体を回り込んで映す。あいだに暗転、だんだん速く）
     ///   → 文字の裏から光が吹き出す → 青・白の閃光 → 銀の文字が飛んできてドン
     ///   → 昇格（前ぶれ→白く飛ぶ→一瞬で金に切り替え＋跳ねる）→ 紫の光線で切り裂かれて灰色に固まる（タメ）
     ///   → 一気に虹（1回転→止まる→1回転）→ 余韻（背景の色が切り替わり続ける）
@@ -19,8 +19,9 @@ namespace PachiMoji
     public class PachiStage
     {
         // ───────── 時刻（秒） ─────────
-        public const float Rumble = 1.0f;       // うなりの終わり＝暗転の始まり
-        public const float Tame = 1.0f;         // 暗転の長さ
+        public const float Rumble = 1.1f;       // プチュン（画面が消える）の終わり＝暗転の始まり
+        public const float PuchunAt = 0.7f;     // 画面がつぶれ始める時刻
+        public const float Tame = 1.3f;         // 暗転（無音）の長さ
         public const float RayLen = 0.6f;       // 最後のチラ見せのあと、文字の裏から光が吹き出す長さ
         public const float Pre = 0.35f;         // 昇格の前ぶれ（暗くなって震える）
         public const float WhiteGold = 0.12f;   // 金に変わる前に白く飛ぶ長さ
@@ -231,14 +232,26 @@ namespace PachiMoji
             float bgMode = 0, bgGain = 1, bgCore = 1, bgBolts = 1, bgSparks = 1, bgRays = 0, bgReach = 2, fgRays = 0, fgReach = 2;
             float glint = 0;
             float slash = 0, slashProg = 0, gray = 0;
+            float bgSx = 1, bgSy = 1;   // 背景の板のつぶれ具合（プチュン用）
 
             if (t < Rumble)
             {
-                // うなり：赤い背景がじわじわ明るくなり、揺れが強くなる。文字はまだ出さない
-                float u = t / Rumble;
+                // プチュン：ふだんの画面が、テレビの電源を切ったように
+                // 縦につぶれて白い横線 → 横も縮んで光の点 → 消える。文字はまだ出さない
                 textOn = false;
-                bgGain = Mathf.Lerp(0.02f, 0.3f, u * u); bgCore = 0.15f; bgBolts = 0; bgSparks = 0.3f;
-                shake = 0.03f * u;
+                bgMode = 0; bgGain = 0.55f; bgCore = 0.6f; bgBolts = 0; bgSparks = 0.6f;
+                if (t >= PuchunAt)
+                {
+                    float q = t - PuchunAt;
+                    float a1 = Clamp01(q / 0.1f);              // 縦につぶれる
+                    float a2 = Clamp01((q - 0.1f) / 0.09f);    // 横も縮む
+                    float a3 = Clamp01((q - 0.19f) / 0.18f);   // 点が消える
+                    bgSy = Mathf.Lerp(1f, 0.004f, 1 - (1 - a1) * (1 - a1));
+                    bgSx = Mathf.Lerp(1f, 0.012f, a2 * a2);
+                    bgGain = Mathf.Lerp(0.55f, 6f, a1) * (1 - a3);   // つぶれるほど白く光る
+                    bgCore = 2.5f;
+                    if (a3 >= 1) bgGain = 0;
+                }
             }
             else if (t < FlashStart)
             {
@@ -396,7 +409,7 @@ namespace PachiMoji
             cam.fieldOfView = fov;
             // 背景の板は画面ぴったりに（大きすぎると、白く光る中心だけが拡大されて映る）
             float bh = 2 * BgDist * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * 1.04f;
-            bg.localScale = new Vector3(bh * aspect, bh, 1);
+            bg.localScale = new Vector3(bh * aspect * bgSx, bh * bgSy, 1);
 
             bgMat.SetFloat("_T", t);
             bgMat.SetFloat("_Mode", bgMode);

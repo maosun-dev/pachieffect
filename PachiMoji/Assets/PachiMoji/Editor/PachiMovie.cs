@@ -8,7 +8,9 @@ using UnityEngine;
 namespace PachiMoji.EditorTools
 {
     /// <summary>
-    /// 確認用：演出を1コマずつ描いて mp4 に書き出す（pachieffect/captures）。
+    /// 確認用：演出を1コマずつ描いて PNG の連番に書き出す（pachieffect/captures/frames）。
+    /// mp4 には movie.sh が ffmpeg でまとめる（Unity の MediaEncoder は画質が足りず、
+    /// 背景が細かく動く場面でブロック状に崩れ、暗転に前の絵の残像が出たため使わない）。
     /// あわせて、0.25 秒ごとのコマを並べた一覧画像も作る。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiMovie.Run で動かす。
     /// </summary>
@@ -23,7 +25,7 @@ namespace PachiMoji.EditorTools
             {
                 string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../captures"));
                 Directory.CreateDirectory(outDir);
-                Render(new[] { "定時", "退社" }, 720, 1280, Path.Combine(outDir, "movie_teiji.mp4"), Path.Combine(outDir, "movie_teiji_sheet.png"));
+                Render(new[] { "定時", "退社" }, 720, 1280, Path.Combine(outDir, "frames"), Path.Combine(outDir, "movie_teiji_sheet.png"));
             }
             catch (Exception e)
             {
@@ -33,7 +35,7 @@ namespace PachiMoji.EditorTools
             if (Application.isBatchMode) EditorApplication.Exit(code);
         }
 
-        static void Render(string[] lines, int w, int h, string mp4, string sheetPath)
+        static void Render(string[] lines, int w, int h, string frameDir, string sheetPath)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var st = PachiStage.Build(lines, (float)w / h);
@@ -53,16 +55,8 @@ namespace PachiMoji.EditorTools
             var clear = new Color32[sheet.width * sheet.height];
             sheet.SetPixels32(clear);
 
-            var attr = new VideoTrackAttributes
-            {
-                frameRate = new MediaRational(Fps),
-                width = (uint)w,
-                height = (uint)h,
-                includeAlpha = false,
-                bitRateMode = VideoBitrateMode.High,
-            };
-            if (File.Exists(mp4)) File.Delete(mp4);
-            using (var enc = new MediaEncoder(mp4, attr))
+            if (Directory.Exists(frameDir)) Directory.Delete(frameDir, true);
+            Directory.CreateDirectory(frameDir);
             {
                 for (int f = 0; f < total; f++)
                 {
@@ -75,7 +69,7 @@ namespace PachiMoji.EditorTools
                     frame.ReadPixels(new Rect(0, 0, w, h), 0, 0);
                     frame.Apply();
                     RenderTexture.active = prev;
-                    enc.AddFrame(frame);
+                    File.WriteAllBytes(Path.Combine(frameDir, $"f{f:D4}.png"), frame.EncodeToPNG());
 
                     if (f % every == 0)
                     {
@@ -90,7 +84,7 @@ namespace PachiMoji.EditorTools
             File.WriteAllBytes(sheetPath, sheet.EncodeToPNG());
             st.cam.targetTexture = null;
             big.Release(); small.Release();
-            Debug.Log($"[PachiMovie] saved {Path.GetFileName(mp4)} frames={total} seconds={st.End:F2}");
+            Debug.Log($"[PachiMovie] saved frames={total} seconds={st.End:F2}");
         }
 
         // 縮小（近い画素を拾うだけの簡単なもの）
