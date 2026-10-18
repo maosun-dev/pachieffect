@@ -17,7 +17,7 @@ namespace PachiMoji.EditorTools
         struct Shot
         {
             public string file; public string[] lines; public PachiText.Finish finish; public int w, h;
-            public float yaw, pitch; public string font;
+            public float yaw, pitch; public string font; public int bg; public float t;
         }
 
         public static void Run()
@@ -25,13 +25,14 @@ namespace PachiMoji.EditorTools
             int code = 0;
             try
             {
+                // 角度は参考ロゴのように強め（斜め下から見上げて、側面の厚みを見せる）。bg：0=炎 1=虹 2=青
                 var shots = new[]
                 {
-                    new Shot { file = "kakutei_gold", lines = new[] { "確定" }, finish = PachiText.Finish.Gold, w = 1600, h = 900, yaw = -10, pitch = 6 },
-                    new Shot { file = "kakutei_rainbow", lines = new[] { "確定" }, finish = PachiText.Finish.Rainbow, w = 1600, h = 900, yaw = 8, pitch = 6 },
-                    new Shot { file = "gekiatsu_gold", lines = new[] { "激アツ" }, finish = PachiText.Finish.Gold, w = 1600, h = 900, yaw = -8, pitch = 4 },
-                    new Shot { file = "teiji_rainbow", lines = new[] { "定時", "退社" }, finish = PachiText.Finish.Rainbow, w = 1080, h = 1920, yaw = -8, pitch = 6 },
-                    new Shot { file = "kakutei_silver_mincho", lines = new[] { "確定" }, finish = PachiText.Finish.Silver, w = 1600, h = 900, yaw = 10, pitch = 6, font = "ZenOldMinchoBlack" },
+                    new Shot { file = "kakutei_gold", lines = new[] { "確定" }, finish = PachiText.Finish.Gold, w = 1600, h = 900, yaw = -26, pitch = 12, bg = 0, t = 3.1f },
+                    new Shot { file = "kakutei_rainbow", lines = new[] { "確定" }, finish = PachiText.Finish.Rainbow, w = 1600, h = 900, yaw = 22, pitch = 12, bg = 1, t = 7.4f },
+                    new Shot { file = "gekiatsu_gold", lines = new[] { "激アツ" }, finish = PachiText.Finish.Gold, w = 1600, h = 900, yaw = -22, pitch = 10, bg = 0, t = 11.2f },
+                    new Shot { file = "teiji_rainbow", lines = new[] { "定時", "退社" }, finish = PachiText.Finish.Rainbow, w = 1080, h = 1920, yaw = -24, pitch = 12, bg = 0, t = 5.3f },
+                    new Shot { file = "kakutei_silver_mincho", lines = new[] { "確定" }, finish = PachiText.Finish.Silver, w = 1600, h = 900, yaw = 24, pitch = 12, font = "ZenOldMinchoBlack", bg = 2, t = 2.2f },
                 };
                 string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../captures"));
                 Directory.CreateDirectory(outDir);
@@ -57,14 +58,14 @@ namespace PachiMoji.EditorTools
             // カメラ：少し下から見上げる
             var camGo = new GameObject("Camera");
             var cam = camGo.AddComponent<Camera>();
-            cam.fieldOfView = 28;
+            cam.fieldOfView = 32;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
             cam.nearClipPlane = 0.1f; cam.farClipPlane = 100;
             float aspect = (float)s.w / s.h;
-            float fitH = Mathf.Max(b.size.y, b.size.x / aspect) * 1.25f;
+            float fitH = Mathf.Max(b.size.y, b.size.x / aspect) * (aspect < 1 ? 1.12f : 1.38f);
             float dist = fitH * 0.5f / Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
-            camGo.transform.position = b.center + new Vector3(0, -fitH * 0.12f, -dist);
+            camGo.transform.position = b.center + new Vector3(0, -fitH * 0.22f, -dist);
             camGo.transform.LookAt(b.center + new Vector3(0, fitH * 0.02f, 0));
             var acd = cam.GetUniversalAdditionalCameraData();
             acd.renderPostProcessing = true;
@@ -78,10 +79,8 @@ namespace PachiMoji.EditorTools
             float bgH = 2 * bgDist * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 1.05f;
             bg.transform.localScale = new Vector3(bgH * aspect, bgH, 1);
             var bgMat = new Material(Shader.Find("PachiMoji/Burst"));
-            if (s.finish == PachiText.Finish.Silver)
-            {
-                bgMat.SetColor("_C1", new Color(0.55f, 0.75f, 1f)); bgMat.SetColor("_C2", new Color(0.12f, 0.25f, 0.9f)); bgMat.SetColor("_C3", new Color(0.02f, 0.02f, 0.15f));
-            }
+            bgMat.SetFloat("_Mode", s.bg);
+            bgMat.SetFloat("_T", s.t);
             bg.GetComponent<MeshRenderer>().sharedMaterial = bgMat;
 
             // 光のにじみ（ブルーム）

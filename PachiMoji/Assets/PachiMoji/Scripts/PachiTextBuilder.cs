@@ -33,11 +33,18 @@ namespace PachiMoji
         public class Style
         {
             public float faceInset = -4;     // 表の面は輪郭より少し内側
+            // 表の面の丸み：輪郭から内側へ (offset, 奥行き) の段を重ねて、中ほどを手前へ盛り上げる（面ごとに映り込みが変わる）
+            public Vector2[] faceBulge = { new Vector2(-4, 0), new Vector2(-14, -3), new Vector2(-30, -5) };
+            // 側面の段々：外周から (offset, 奥行き) を順にたどる。offset が変わる所は面取りの段になる
+            public Vector2[] sideProfile =
+            {
+                new Vector2(0, 32), new Vector2(0, 150), new Vector2(-12, 160), new Vector2(-12, 182), new Vector2(0, 194),
+                new Vector2(0, 300), new Vector2(-12, 310), new Vector2(-12, 332), new Vector2(0, 344), new Vector2(0, 470),
+            };
             public Step[] steps;             // 字の輪郭まわりの段（細い線・溝）。offset は字の輪郭から
             public float silhouette = 95;    // 言葉全体の外周（字の輪郭からこれだけ太らせ、穴は埋める）
             public float floorZ = 40;        // 字のすき間の、沈んだ床の奥行き
             public Step[] rimSteps;          // 外周の太いフチ。offset は外周から（マイナス＝内側）
-            public float sideDepth = 230;    // 側面（押し出し）の深さ
             public float tracking = -60;     // 字間（マイナスで詰めて、フチをつなげる）
             public float lineGap = -40;      // 行間
         }
@@ -184,8 +191,11 @@ namespace PachiMoji
             }
             var front = new Vector3(0, 0, -1);
 
-            // 表の面
-            Fill(b, Off(style.faceInset), null, 0, 0, front, Part.Face);
+            // 表の面（内側へ段を重ねて中ほどを盛り上げる）
+            var fb = style.faceBulge;
+            for (int i = 0; i + 1 < fb.Length; i++)
+                Fill(b, Off(fb[i].x), Off(fb[i + 1].x), fb[i].y, fb[i + 1].y, front, Part.Face);
+            Fill(b, Off(fb[fb.Length - 1].x), null, fb[fb.Length - 1].y, fb[fb.Length - 1].y, front, Part.Face);
 
             // 字の輪郭まわりの段（細い線・溝）
             foreach (var s in style.steps)
@@ -200,27 +210,17 @@ namespace PachiMoji
             foreach (var s in style.rimSteps)
                 Fill(b, OffS(s.outer), OffS(s.inner), s.zOut, s.zIn, front, s.part);
 
-            // 側面（押し出し）と裏ふた
-            var lastRim = style.rimSteps[style.rimSteps.Length - 1];
-            var edge = OffS(lastRim.outer);
-            float z0 = lastRim.zOut, z1 = lastRim.zOut + style.sideDepth;
-            foreach (var path in edge)
+            // 側面（押し出し）：段々に面取りしながら奥へ。最後に裏ふた
+            var sp = style.sideProfile;
+            for (int i = 0; i + 1 < sp.Length; i++)
             {
-                int c = path.Count;
-                for (int i = 0; i < c; i++)
-                {
-                    var p = path[i]; var q = path[(i + 1) % c];
-                    var a0 = new Vector3((float)p.x, (float)p.y, z0);
-                    var b0 = new Vector3((float)q.x, (float)q.y, z0);
-                    var a1 = new Vector3((float)p.x, (float)p.y, z1);
-                    var b1 = new Vector3((float)q.x, (float)q.y, z1);
-                    // Clipper の外周は反時計回り（面積が正）なので、外向きは (dy, -dx)
-                    var want = new Vector3((float)(q.y - p.y), (float)-(q.x - p.x), 0);
-                    b.Tri(a0, b0, b1, want, Part.Side, 1);
-                    b.Tri(a0, b1, a1, want, Part.Side, 1);
-                }
+                var p0 = sp[i]; var p1 = sp[i + 1];
+                if (Mathf.Approximately(p0.x, p1.x)) Wall(b, OffS(p0.x), p0.y, p1.y);
+                else if (p1.x < p0.x) Fill(b, OffS(p0.x), OffS(p1.x), p0.y, p1.y, new Vector3(0, 0, 1), Part.Side);   // 内へ入る段（奥向き）
+                else Fill(b, OffS(p1.x), OffS(p0.x), p1.y, p0.y, front, Part.Rim);                                    // 外へ出る段（手前向き・光る）
             }
-            Fill(b, edge, null, z1, z1, new Vector3(0, 0, 1), Part.Side);
+            var back = sp[sp.Length - 1];
+            Fill(b, OffS(back.x), null, back.y, back.y, new Vector3(0, 0, 1), Part.Side);
 
             var mesh = new Mesh { indexFormat = IndexFormat.UInt32 };
             for (int i = 0; i < b.v.Count; i++) b.v[i] *= scale;
@@ -264,6 +264,27 @@ namespace PachiMoji
                 if (picked.Count >= max) break;
             }
             return picked;
+        }
+
+        /// <summary>輪郭をまっすぐ奥へ伸ばした壁（z0 → z1）</summary>
+        static void Wall(Builder b, PathsD edge, float z0, float z1)
+        {
+            foreach (var path in edge)
+            {
+                int c = path.Count;
+                for (int i = 0; i < c; i++)
+                {
+                    var p = path[i]; var q = path[(i + 1) % c];
+                    var a0 = new Vector3((float)p.x, (float)p.y, z0);
+                    var b0 = new Vector3((float)q.x, (float)q.y, z0);
+                    var a1 = new Vector3((float)p.x, (float)p.y, z1);
+                    var b1 = new Vector3((float)q.x, (float)q.y, z1);
+                    // Clipper の外周は反時計回り（面積が正）なので、外向きは (dy, -dx)
+                    var want = new Vector3((float)(q.y - p.y), (float)-(q.x - p.x), 0);
+                    b.Tri(a0, b0, b1, want, Part.Side, 1);
+                    b.Tri(a0, b1, a1, want, Part.Side, 1);
+                }
+            }
         }
 
         /// <summary>outer の内側から inner を抜いた領域を三角形で埋める。inner 側の点は zIn、outer 側の点は zOut に置く（＝斜面になる）</summary>
