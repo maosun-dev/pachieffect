@@ -1,6 +1,6 @@
 // 光の放射：画面の中心から吹き出す、虹色がかった細い光の筋。カメラの目の前の板に足し算で重ねる
 // （チラ見せの超アップでは文字が画面いっぱいで背景が映らないので、手前に重ねて「文字の裏から光が漏れる」ように見せる）
-// あわせて、切り裂き（画面を斜めに横切る紫の光線）もここで描く
+// あわせて、切り裂き（画面を斜めに横切る紫の光線）と、プチュン（青白い閃光 → 中心の光の点のまわりに青い電気）もここで描く
 Shader "PachiMoji/Rays"
 {
     Properties
@@ -10,6 +10,9 @@ Shader "PachiMoji/Rays"
         _T ("Time", Float) = 0
         _Slash ("Slash Strength", Float) = 0
         _SlashProg ("Slash Progress", Float) = 0
+        _PFlash ("Puchun Flash", Float) = 0
+        _PDot ("Puchun Dot", Float) = 0
+        _PArc ("Puchun Arcs", Float) = 0
     }
     SubShader
     {
@@ -25,7 +28,7 @@ Shader "PachiMoji/Rays"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float _Rays, _RayReach, _T, _Slash, _SlashProg;
+                float _Rays, _RayReach, _T, _Slash, _SlashProg, _PFlash, _PDot, _PArc;
             CBUFFER_END
             float4 vert(float4 pos : POSITION) : SV_POSITION { return TransformObjectToHClip(pos.xyz); }
 
@@ -36,6 +39,14 @@ Shader "PachiMoji/Rays"
                 float2 u = f * f * (3 - 2 * f);
                 return lerp(lerp(hash21(i), hash21(i + float2(1, 0)), u.x), lerp(hash21(i + float2(0, 1)), hash21(i + float2(1, 1)), u.x), u.y);
             }
+            // 折れ線のノイズ（稲妻のギザギザ用）
+            float lnoise(float x, float seed)
+            {
+                float i = floor(x), f = frac(x);
+                return lerp(hash21(float2(i, seed)), hash21(float2(i + 1, seed)), f) - 0.5;
+            }
+            float zigzag(float x, float seed) { return lnoise(x, seed) * 0.6 + lnoise(x * 2.7, seed + 9.1) * 0.3 + lnoise(x * 7.3, seed + 3.7) * 0.12; }
+
             float3 hsv2rgb(float h, float s, float v)
             {
                 float3 k = saturate(abs(frac(h + float3(0, 2.0/3.0, 1.0/3.0)) * 6 - 3) - 1);
@@ -72,6 +83,35 @@ Shader "PachiMoji/Rays"
                                 + float3(0.95, 0.15, 1.0) * exp(-d * 40) * 1.6
                                 + float3(0.6, 0.05, 0.9) * exp(-d * 9) * 0.5;
                     c += beam * m * _Slash;
+                }
+                // プチュン
+                if (_PFlash + _PDot + _PArc > 0)
+                {
+                    float3 ice = float3(0.55, 0.75, 1.0);
+                    // 青白い閃光：画面いっぱい＋真ん中に横長の光の筋
+                    c += (float3(0.75, 0.85, 1.0) * (0.9 - 0.35 * saturate(r)) + float3(1, 1, 1) * exp(-abs(p.y) * 22) * 1.5) * _PFlash;
+                    // 中心の光の点と、細い横の光の筋（レンズのフレア）
+                    float dot0 = exp(-r * r * 2500) * 4 + exp(-r * 40) * 0.6;
+                    float streak = exp(-abs(p.y) * 420) * exp(-abs(p.x) * 3.5) * 2.2;
+                    c += (float3(1, 1, 1) * dot0 + ice * streak) * _PDot;
+                    // 青い電気：中心の近くから、主に左右へ走るギザギザの線。形はすぐ変わる
+                    float arcs = 0;
+                    float tb = floor(_T * 18);
+                    float pa = atan2(p.y, p.x);
+                    [unroll] for (int k = 0; k < 6; k++)
+                    {
+                        float seed = k * 7.31 + tb * 1.93;
+                        float side = hash21(float2(seed, 2.2)) < 0.5 ? 0 : 3.14159265;
+                        float ang = side + (hash21(float2(seed, 5.5)) - 0.5) * 0.9;
+                        float len = lerp(0.18, 0.55, hash21(float2(seed, 8.1)));
+                        float on = step(0.3, hash21(float2(seed, 4.4)));
+                        float da = pa - ang; da = da - 6.2831853 * round(da / 6.2831853);
+                        float jag = zigzag(r * 14, seed) * 0.9;
+                        float dist = abs((da - jag) * r);
+                        float mask = smoothstep(0.02, 0.06, r) * (1 - smoothstep(len * 0.6, len, r));
+                        arcs += on * mask * (exp(-dist * 900) * 2.2 + exp(-dist * 110) * 0.5);
+                    }
+                    c += ice * arcs * _PArc;
                 }
                 return half4(c, 1);
             }
