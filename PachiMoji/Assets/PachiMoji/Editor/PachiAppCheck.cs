@@ -3,7 +3,9 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace PachiMoji.EditorTools
 {
@@ -78,6 +80,10 @@ namespace PachiMoji.EditorTools
                 var twelve = new[] { "脳汁ドバドバ", "激アツ確定だ" };
                 ShotEffect(720, 1560, Path.Combine(outDir, "fit_12_end.png"), twelve, e => e.Evaluate(e.Duration - 0.5f));
                 ShotEffect(720, 1560, Path.Combine(outDir, "fit_12_idle.png"), twelve, e => e.Idle(1f));
+
+                // 画面の素材の一覧（コードで描いた絵と、2つの画面用の書体）
+                Expect(UiTheme.Display != null && UiTheme.Body != null, "画面用の書体が読める");
+                ShotUi(720, 1280, Path.Combine(outDir, "ui_parts.png"), null, PartsSheet);
             }
             catch (Exception e)
             {
@@ -87,6 +93,94 @@ namespace PachiMoji.EditorTools
             if (failed == 0) Debug.Log("[PachiAppCheck] OK");
             else Debug.LogError($"[PachiAppCheck] NG {failed} 件");
             if (Application.isBatchMode) EditorApplication.Exit(failed == 0 ? 0 : 1);
+        }
+
+        // 素材を並べる：ドーム2つ・銀の板・歯車・メダル3枚と金の帯・書体の見本
+        static void PartsSheet(RectTransform root)
+        {
+            Img(root, UiArt.Dome(true), new Vector2(-95, 260), new Vector2(170, 170));
+            Img(root, UiArt.Dome(false), new Vector2(95, 260), new Vector2(170, 170));
+            Text(root, "PUSH", UiTheme.Display, 40, Color.white, new Vector2(-95, 260), new Vector2(170, 60));
+            var plate = Img(root, UiArt.ChromePlate(), new Vector2(0, 90), new Vector2(330, 104));
+            plate.type = Image.Type.Sliced;
+            Text(root, "定時", UiTheme.Display, 30, UiTheme.Chrome, new Vector2(0, 112), new Vector2(300, 44));
+            Text(root, "2行目（なくてもOK）", UiTheme.Body, 16, UiTheme.Muted, new Vector2(0, 66), new Vector2(300, 40));
+            Img(root, UiArt.Gear(), new Vector2(150, 360), new Vector2(36, 36));
+            var rail = Img(root, UiArt.Rail(), new Vector2(-50, -60), new Vector2(200, 22));
+            rail.type = Image.Type.Sliced;
+            Img(root, UiArt.Medal(Tier.Silver), new Vector2(-100, -60), new Vector2(64, 64));
+            Img(root, UiArt.Medal(Tier.Gold), new Vector2(0, -60), new Vector2(64, 64));
+            Img(root, UiArt.Medal(Tier.Rainbow), new Vector2(100, -60), new Vector2(64, 64));
+            Text(root, "脳汁メーカー", UiTheme.Display, 34, UiTheme.Chrome, new Vector2(0, -160), new Vector2(340, 50));
+            Text(root, "言葉を入れると PUSH できます", UiTheme.Body, 16, UiTheme.Muted, new Vector2(0, -205), new Vector2(340, 30));
+            Text(root, "「😀」はこの書体で出せません", UiTheme.Body, 16, UiTheme.Muted, new Vector2(0, -235), new Vector2(340, 30));
+        }
+
+        static Image Img(RectTransform parent, Sprite sp, Vector2 pos, Vector2 size)
+        {
+            var go = new GameObject("Img", typeof(RectTransform), typeof(Image));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
+            var img = go.GetComponent<Image>();
+            img.sprite = sp;
+            return img;
+        }
+
+        static void Text(RectTransform parent, string s, TMP_FontAsset font, float size, Color c, Vector2 pos, Vector2 box)
+        {
+            var go = new GameObject("Text", typeof(RectTransform));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchoredPosition = pos; rt.sizeDelta = box;
+            var t = go.AddComponent<TextMeshProUGUI>();
+            t.font = font; t.fontSize = size; t.color = c; t.text = s;
+            t.alignment = TextAlignmentOptions.Center;
+        }
+
+        /// <summary>
+        /// 画面（uGUI）を1枚に撮る。stage があれば舞台を描いてから、その上に UI カメラで重ねる。
+        /// build は基準 390×844 の Canvas の根っこに部品を並べる。
+        /// </summary>
+        static void ShotUi(int w, int h, string path, Camera stage, Action<RectTransform> build)
+        {
+            if (stage == null) EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = new GameObject("UiCamera").AddComponent<Camera>();
+            uiCam.orthographic = true;
+            uiCam.clearFlags = stage == null ? CameraClearFlags.SolidColor : CameraClearFlags.Depth;
+            uiCam.backgroundColor = Color.black;
+            uiCam.cullingMask = 1 << 5;   // UI の層だけ
+            uiCam.targetTexture = rt;
+            var canvasGo = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler));
+            canvasGo.layer = 5;
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = uiCam;
+            canvas.planeDistance = 1;
+            var scaler = canvasGo.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = UiTheme.ReferenceSize;
+            scaler.matchWidthOrHeight = 0;
+            build((RectTransform)canvasGo.transform);
+            foreach (var t in canvasGo.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = 5;
+            Canvas.ForceUpdateCanvases();
+            if (stage != null) { stage.targetTexture = rt; stage.Render(); stage.targetTexture = null; }
+            uiCam.Render();
+            Canvas.ForceUpdateCanvases();
+            uiCam.Render();   // 1回目は TMP の字の形が作られる前に描かれることがあるので、もう1回
+            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            tex.Apply();
+            RenderTexture.active = prev;
+            uiCam.targetTexture = null;
+            rt.Release();
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            UnityEngine.Object.DestroyImmediate(canvasGo);
+            UnityEngine.Object.DestroyImmediate(uiCam.gameObject);
+            Debug.Log("[PachiAppCheck] 書き出し " + path);
         }
 
         static int Count<T>() where T : UnityEngine.Object => Resources.FindObjectsOfTypeAll<T>().Length;
