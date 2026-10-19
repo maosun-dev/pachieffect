@@ -155,6 +155,13 @@ namespace PachiMoji.EditorTools
                 ShotExport(720, 1560, Path.Combine(outDir, "main_9x19_exported.png"), AppState.Exported, ui => ui.SetSaved(true));
                 ShotMain(720, 1560, Path.Combine(outDir, "main_9x19_export_error.png"), "定時", "退社", AppState.Finished,
                     ui => ui.EndNotice.text = ExportRules.Message(ExportError.NoSpace));
+                // ネットが無いとき：「書き出す」を押せず、知らせを出す
+                ShotMain(720, 1560, Path.Combine(outDir, "main_9x19_need_network.png"), "定時", "退社", AppState.Finished, ui =>
+                {
+                    ui.SetExportReady(false);
+                    ui.EndNotice.text = ExportGate.Message(GateAction.NeedNetwork);
+                    Expect(!ui.Export.interactable, "ネットが無ければ「書き出す」を押せない");
+                });
 
                 // 設定画面：既定と、全部を変えたとき
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
@@ -165,6 +172,27 @@ namespace PachiMoji.EditorTools
                     sc => { Expect(sc.FirstColorsEnabled, "はじまりが銀なら最初の色を選べる"); Expect(sc.Scrollable, "設定画面を縦に動かせる"); });
                 ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_gold.png"), new EffectSettings { From = Tier.Gold },
                     sc => Expect(!sc.FirstColorsEnabled, "はじまりが金なら最初の色は押せない"), bottom: true);
+
+                // 買い物：何も買っていない（3つ）・印を消す済み（残り1つ）・両方済み（買ったものと復元だけ）・ストアにつながらない
+                Func<string, string> price = id => id == ProductIds.Set ? "¥500" : "¥300";
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_shop_none.png"), new EffectSettings(), sc =>
+                {
+                    sc.ShowShop(new Entitlements(new string[0]), ShopState.Ready, price);
+                    Expect(sc.ShopItemCount == 3, "何も買っていなければ商品は3つ");
+                });
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_shop_nomark.png"), new EffectSettings(), sc =>
+                {
+                    sc.ShowShop(new Entitlements(new[] { ProductIds.NoMark }), ShopState.Ready, price);
+                    sc.ShowShopNotice("ありがとうございます。購入しました");
+                    Expect(sc.ShopItemCount == 1, "片方を買ったら商品は残りの1つ");
+                });
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_shop_both.png"), new EffectSettings(), sc =>
+                {
+                    sc.ShowShop(new Entitlements(new[] { ProductIds.Set }), ShopState.Ready, price);
+                    Expect(sc.ShopItemCount == 0, "両方買ったら商品は無し");
+                });
+                ShotSettings(720, 1280, Path.Combine(outDir, "settings_shop_unavailable.png"), new EffectSettings(), sc =>
+                    sc.ShowShop(new Entitlements(new string[0]), ShopState.Unavailable, _ => null));
 
                 // 広告：追跡の許可（ATT）の部品は iPhone だけ。手元（Editor）では広告を動かさず、ごほうびは見終えた扱い
                 var att = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiTracking.mm") as PluginImporter;
@@ -334,9 +362,9 @@ namespace PachiMoji.EditorTools
             var screen = SettingsScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h), settings, _ => { });
             screen.Show(true);
             screen.SetSlide(0);
+            check?.Invoke(screen);
             Canvas.ForceUpdateCanvases();
             if (check != null || bottom) screen.ScrollTo(0);   // いちばん下
-            check?.Invoke(screen);
             RenderUi(rt, path, uiCam);
         }
 

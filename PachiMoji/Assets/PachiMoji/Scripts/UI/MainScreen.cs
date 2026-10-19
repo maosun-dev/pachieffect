@@ -237,6 +237,13 @@ namespace PachiMoji
             m.SetExportProgress(0);
         }
 
+        /// <summary>「書き出す」を押せるか（ネットが無い・広告が読めないときは押せない。文字を灰にする）</summary>
+        public void SetExportReady(bool ready)
+        {
+            Export.interactable = ready;
+            Export.GetComponentInChildren<TMP_Text>().color = ready ? UiTheme.Chrome : UiTheme.Muted;
+        }
+
         /// <summary>書き出しの進み具合（0〜100）</summary>
         public void SetExportProgress(int percent)
         {

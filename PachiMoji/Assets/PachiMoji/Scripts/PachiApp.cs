@@ -8,6 +8,7 @@ namespace PachiMoji
     /// <summary>
     /// アプリの流れ：言葉を入れて待つ → PUSH で演出 → 終わったら「もう一回」「書き出す」「言葉を変える」。
     /// 書き出すと、画面の舞台を片付けて書き出し用の演出を別に組み立て、終わったら「写真に保存」「共有」。
+    /// 広告を消していない人は、書き出しの前にごほうび広告を最後まで見る（ExportGate）。印は買ったもので決まる（Entitlements）。
     /// 舞台を組み立て直すのは、入力を確定したときと設定を閉じたときだけ（言葉と設定が前と同じなら作り直さない）。
     /// </summary>
     public class PachiApp : MonoBehaviour
@@ -19,6 +20,9 @@ namespace PachiMoji
         EffectSettings settings;
         StageScreen stage;
         VideoExporter exporter;
+        Shop shop;
+        Ads ads;
+        float gateCheckT;   // ネットのつながりを確かめ直すまで（秒）
         string builtKey;
         InputCheck check;
         MainScreen ui;
@@ -54,11 +58,23 @@ namespace PachiMoji
             ui.Again.onClick.AddListener(StartPlay);
             ui.ChangeWords.onClick.AddListener(BackToIdle);
             ui.Gear.onClick.AddListener(OpenSettings);
-            ui.Export.onClick.AddListener(StartExport);
+            ui.Export.onClick.AddListener(OnExportPressed);
             ui.CancelExport.onClick.AddListener(CancelExport);
             ui.SavePhoto.onClick.AddListener(SavePhoto);
             ui.Share.onClick.AddListener(() => VideoShare.Share(exporter?.OutputPath));
             ui.CloseExport.onClick.AddListener(BackToFinished);
+
+            // 課金と広告：端末に残っていた買ったもので始める（ネットなしでも効く）
+            shop = new Shop(Entitlements.Load());
+            shop.Changed += OnShopChanged;
+            shop.Notice += settingsUi.ShowShopNotice;
+            settingsUi.Buy = shop.Buy;
+            settingsUi.Restore.onClick.AddListener(shop.Restore);
+            ads = new Ads();
+            ads.Changed += RefreshExportGate;
+            ads.Start(shop.Owned.ShowAds);
+            OnShopChanged();
+            _ = shop.Connect();
 
             Canvas.ForceUpdateCanvases();
             Rebuild();
@@ -84,6 +100,12 @@ namespace PachiMoji
             }
             ui.Pulse(Time.unscaledTime);
             if (state == AppState.Exporting) StepExport();
+            // 終わりの画面では、機内モードの切り替えなどに合わせて「書き出す」を押せるかを1秒ごとに決め直す
+            if (state == AppState.Finished && (gateCheckT -= dt) <= 0)
+            {
+                gateCheckT = 1;
+                RefreshExportGate();
+            }
 
             if (!stage.Visible) return;
             var fx = stage.Effect;
@@ -119,6 +141,54 @@ namespace PachiMoji
 
         // ───────── 書き出し ─────────
 
+        // 「書き出す」：広告を消した人はすぐ。ほかはごほうび広告を最後まで見てから
+        void OnExportPressed()
+        {
+            if (state != AppState.Finished || exporter != null) return;
+            var gate = Gate();
+            switch (gate)
+            {
+                case GateAction.ExportNow:
+                    StartExport();
+                    break;
+                case GateAction.ShowAd:
+                    ads.ShowRewarded(watched =>
+                    {
+                        if (state != AppState.Finished) return;
+                        if (watched) StartExport();
+                        else ui.EndNotice.text = ExportGate.NotWatched;
+                    });
+                    break;
+                default:
+                    RefreshExportGate();
+                    break;
+            }
+        }
+
+        GateAction Gate() => ExportGate.Decide(shop.Owned.ShowAds,
+            Application.internetReachability != NetworkReachability.NotReachable, ads.Rewarded);
+
+        // 終わりの画面の「書き出す」を押せるかと、その知らせ
+        void RefreshExportGate()
+        {
+            if (state != AppState.Finished || exporter != null) return;
+            var gate = Gate();
+            ui.SetExportReady(gate == GateAction.ExportNow || gate == GateAction.ShowAd);
+            string msg = ExportGate.Message(gate);
+            if (msg != "") ui.EndNotice.text = msg;
+            else if (ui.EndNotice.text == ExportGate.Message(GateAction.NeedNetwork) || ui.EndNotice.text == ExportGate.Message(GateAction.Wait))
+                ui.EndNotice.text = "";   // 直ったら、待ち・ネットの知らせだけ消す（失敗の知らせは残す）
+        }
+
+        // 買ったものが変わった：設定の買い物を描き直し、広告を消した人はすぐバナーを消す
+        void OnShopChanged()
+        {
+            settingsUi.ShowShop(shop.Owned, shop.State, shop.PriceOf);
+            settingsUi.SetBannerSpace(shop.Owned.ShowAds);
+            if (!shop.Owned.ShowAds) ads.SetBanner(false);
+            RefreshExportGate();
+        }
+
         void StartExport()
         {
             if (state != AppState.Finished || exporter != null) return;
@@ -129,7 +199,7 @@ namespace PachiMoji
             bool ios = Application.platform == RuntimePlatform.IPhonePlayer;
             string path = Path.Combine(Application.temporaryCachePath, ios ? "noujiru.mp4" : "noujiru_frames");
             IVideoWriter writer = ios ? new IosVideoWriter() : new PngVideoWriter();
-            exporter = new VideoExporter(check.Lines, settings, watermark: true /* 順番4で Entitlements につなぐ */, writer, path);
+            exporter = new VideoExporter(check.Lines, settings, watermark: shop.Owned.ShowWatermark, writer, path);
             var e = exporter.Start();
             if (e != ExportError.None)
             {
@@ -276,6 +346,7 @@ namespace PachiMoji
             state = s;
             Screen.sleepTimeout = SleepPolicy.For(s);
             ui.ShowState(s);
+            if (s == AppState.Finished) gateCheckT = 0;   // 終わりの画面に入ったら、すぐ「書き出す」を押せるか決める
             // 舞台の絵を置く範囲：待ちは入力の板より上、再生・終わりはバナーより上の全部
             stage.SetFull(s == AppState.Playing || s == AppState.Finished);
             stage.Frame();
