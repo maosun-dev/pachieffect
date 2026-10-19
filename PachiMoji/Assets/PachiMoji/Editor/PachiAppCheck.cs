@@ -166,6 +166,12 @@ namespace PachiMoji.EditorTools
                 ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_gold.png"), new EffectSettings { From = Tier.Gold },
                     sc => Expect(!sc.FirstColorsEnabled, "はじまりが金なら最初の色は押せない"), bottom: true);
 
+                // 広告：追跡の許可（ATT）の部品は iPhone だけ。手元（Editor）では広告を動かさず、ごほうびは見終えた扱い
+                var att = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiTracking.mm") as PluginImporter;
+                Expect(att != null && att.GetCompatibleWithPlatform(BuildTarget.iOS) && !att.GetCompatibleWithEditor()
+                       && att.GetPlatformData(BuildTarget.iOS, "FrameworkDependencies").Contains("AppTrackingTransparency;"), "PachiTracking.mm は iPhone だけ・ATT の仕組みにつながる");
+                Expect(new Ads().Rewarded == AdState.Ready, "手元ではごほうび広告は Ready 扱い");
+
                 // 課金：ストアにつなぐ前から、端末に残っていた買ったもので始まる。届いた買い物は記録して知らせる（本物の記録は元に戻す）
                 {
                     string backup = PlayerPrefs.GetString("ent.owned", "");
