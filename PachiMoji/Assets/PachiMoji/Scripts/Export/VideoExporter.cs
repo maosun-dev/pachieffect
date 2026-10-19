@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -23,6 +24,10 @@ namespace PachiMoji
         readonly bool watermark;
         readonly IVideoWriter writer;
         readonly Queue<(int frame, AsyncGPUReadbackRequest req)> pending = new Queue<(int, AsyncGPUReadbackRequest)>();
+        // 読み出したコマの写し。読み出しのデータは終わったそのコマの間しか使えないので、すぐここへ写してから書き手に渡す
+        // （書き手が「まだ受け取れない」と言ったら、次の Step で同じ写しをもう一度渡す）
+        readonly Queue<(int frame, NativeArray<byte> data)> ready = new Queue<(int, NativeArray<byte>)>();
+        readonly Stack<NativeArray<byte>> spare = new Stack<NativeArray<byte>>();
         IPachiEffect effect;
         RenderTexture rt;
         Texture2D mark;
@@ -81,21 +86,31 @@ namespace PachiMoji
                 {
                     Status = ExportStatus.Done;
                     ReleaseEffect();   // 板は Preview として残す（Dispose で消える）
+                    ReleaseBuffers();
                     Debug.Log($"[VideoExporter] frames={TotalFrames} 秒={Duration:F1}");
                 }
                 else if (st == FinishState.Failed) Fail(err == ExportError.None ? ExportError.WriteFailed : err);
                 return;
             }
 
-            for (int n = 0; n < MaxPerStep && rendered < TotalFrames && pending.Count < MaxInFlight; n++)
+            for (int n = 0; n < MaxPerStep && rendered < TotalFrames && pending.Count + ready.Count < MaxInFlight; n++)
                 RenderFrame(rendered++);
 
-            while (pending.Count > 0)
+            // 読み出しの終わったコマを、順に写しへ移す
+            while (pending.Count > 0 && pending.Peek().req.done)
             {
-                var (frame, req) = pending.Peek();
-                if (!req.done) break;
+                var (frame, req) = pending.Dequeue();
                 if (req.hasError) { Fail(ExportError.WriteFailed); return; }
-                var r = writer.Append(req.GetData<byte>(), frame);
+                var copy = spare.Count > 0 ? spare.Pop()
+                    : new NativeArray<byte>(ExportPlan.Width * ExportPlan.Height * 4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                copy.CopyFrom(req.GetData<byte>());
+                ready.Enqueue((frame, copy));
+            }
+
+            while (ready.Count > 0)
+            {
+                var (frame, data) = ready.Peek();
+                var r = writer.Append(data, frame);
                 if (r == WriteResult.Busy) break;
                 if (r == WriteResult.Failed)
                 {
@@ -103,7 +118,7 @@ namespace PachiMoji
                     Fail(err == ExportError.None ? ExportError.WriteFailed : err);
                     return;
                 }
-                pending.Dequeue();
+                spare.Push(ready.Dequeue().data);
                 appended++;
             }
 
@@ -145,6 +160,7 @@ namespace PachiMoji
             Status = ExportStatus.Cancelled;
             if (started) writer.Cancel();
             pending.Clear();
+            ReleaseBuffers();
             ReleaseEffect();
             ReleaseRt();
         }
@@ -155,6 +171,7 @@ namespace PachiMoji
             Status = ExportStatus.Failed;
             writer.Cancel();
             pending.Clear();
+            ReleaseBuffers();
             ReleaseEffect();
             ReleaseRt();
             Debug.LogWarning("[VideoExporter] 失敗 " + e);
@@ -165,8 +182,15 @@ namespace PachiMoji
         public void Dispose()
         {
             Cancel();
+            ReleaseBuffers();
             ReleaseEffect();
             ReleaseRt();
+        }
+
+        void ReleaseBuffers()
+        {
+            while (ready.Count > 0) ready.Dequeue().data.Dispose();
+            while (spare.Count > 0) spare.Pop().Dispose();
         }
 
         void ReleaseEffect()

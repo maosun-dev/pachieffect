@@ -321,7 +321,23 @@ namespace PachiMoji.EditorTools
                 Expect(Mathf.Abs(a - b) > 0.05f, "印ありとなしで右下が違う");
             }
             else Expect(false, "印なしのコマ数");
-            DeleteDir(dir); DeleteDir(dirNo);   // 1回で 1GB 近くになるので残さない
+
+            // 受け取り待ち（Busy）：iPhone の動画づくりは、ときどき「まだ受け取れない」を返す。
+            // 次の Step でもう一度渡したコマが、ふつうに書いたコマと同じ中身であること
+            string dirBusy = Path.Combine(outDir, "export_frames_busy");
+            var exB = new VideoExporter(Words, new EffectSettings(), true, new BusyWriter(), dirBusy);
+            exB.Start();
+            for (int i = 0; i < 200 && exB.Status == ExportStatus.Running && !File.Exists(Path.Combine(dirBusy, "f0030.png")); i++)
+            {
+                exB.Step();
+                AsyncGPUReadback.WaitAllRequests();
+            }
+            bool same = File.Exists(Path.Combine(dirBusy, "f0030.png")) && files.Length > 30;
+            for (int f = 0; same && f <= 30; f++)
+                same = File.ReadAllBytes(Path.Combine(dirBusy, $"f{f:D4}.png")).AsSpan().SequenceEqual(File.ReadAllBytes(files[f]));
+            Expect(same, "受け取り待ちのあとに渡したコマも、ふつうと同じ中身");
+            exB.Dispose();
+            DeleteDir(dir); DeleteDir(dirNo); DeleteDir(dirBusy);   // 1回で 1GB 近くになるので残さない
 
             // やめる：作りかけが消える
             var exC = new VideoExporter(Words, new EffectSettings(), true, new PngVideoWriter(), dir);
@@ -391,6 +407,17 @@ namespace PachiMoji.EditorTools
         class FailingWriter : PngVideoWriter
         {
             public override WriteResult Append(NativeArray<byte> bgra, int frame) => frame == 10 ? WriteResult.Failed : base.Append(bgra, frame);
+        }
+
+        // コマごとに1回目は「まだ受け取れない」を返す書き手
+        class BusyWriter : PngVideoWriter
+        {
+            int last = -1;
+            public override WriteResult Append(NativeArray<byte> bgra, int frame)
+            {
+                if (frame != last) { last = frame; return WriteResult.Busy; }
+                return base.Append(bgra, frame);
+            }
         }
 
         // 空き容量が無い書き手

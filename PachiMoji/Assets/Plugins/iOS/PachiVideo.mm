@@ -16,11 +16,12 @@ static AVAssetWriterInput* gInput;
 static AVAssetWriterInputPixelBufferAdaptor* gAdaptor;
 static NSString* gPath;
 static int gW, gH, gFps;
+static int gLastFrame;        // 最後に渡したコマの番号（終わりの時刻を決める）
 static volatile int gState;   // 0 書いている・1 できた・2 失敗（FinishState と同じ）
 static volatile int gError;   // ExportError の数
 
 // 失敗の理由を見分ける：空き容量が無いのか、それ以外か
-static int ErrorOf(NSError* e)
+static int PachiErrorOf(NSError* e)
 {
     for (NSError* x = e; x != nil; x = x.userInfo[NSUnderlyingErrorKey])
     {
@@ -32,19 +33,19 @@ static int ErrorOf(NSError* e)
     return ErrWriteFailed;
 }
 
-static void Reset()
+static void PachiReset()
 {
     gWriter = nil;
     gInput = nil;
     gAdaptor = nil;
 }
 
-static void RemoveFile()
+static void PachiRemoveFile()
 {
     if (gPath != nil) [[NSFileManager defaultManager] removeItemAtPath:gPath error:nil];
 }
 
-static void ReplySaved(NSString* result)
+static void PachiReplySaved(NSString* result)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
         UnitySendMessage("PachiVideoBridge", "OnSaved", result.UTF8String);
@@ -63,15 +64,15 @@ extern "C"
 
     int PachiVideo_Begin(const char* path, int w, int h, int fps, int bitRate)
     {
-        Reset();
+        PachiReset();
         gPath = [NSString stringWithUTF8String:path];
         gW = w; gH = h; gFps = fps;
-        gState = 0; gError = ErrNone;
-        RemoveFile();
+        gState = 0; gError = ErrNone; gLastFrame = -1;
+        PachiRemoveFile();
 
         NSError* err = nil;
         gWriter = [AVAssetWriter assetWriterWithURL:[NSURL fileURLWithPath:gPath] fileType:AVFileTypeMPEG4 error:&err];
-        if (gWriter == nil) { Reset(); return ErrCannotOpen; }
+        if (gWriter == nil) { PachiReset(); return ErrCannotOpen; }
 
         NSDictionary* settings = @{
             AVVideoCodecKey: AVVideoCodecTypeH264,
@@ -92,13 +93,13 @@ extern "C"
                 (id)kCVPixelBufferWidthKey: @(w),
                 (id)kCVPixelBufferHeightKey: @(h),
             }];
-        if (![gWriter canAddInput:gInput]) { Reset(); return ErrCannotOpen; }
+        if (![gWriter canAddInput:gInput]) { PachiReset(); return ErrCannotOpen; }
         [gWriter addInput:gInput];
         if (![gWriter startWriting])
         {
-            int e = ErrorOf(gWriter.error) == ErrNoSpace ? ErrNoSpace : ErrCannotOpen;
-            Reset();
-            RemoveFile();
+            int e = PachiErrorOf(gWriter.error) == ErrNoSpace ? ErrNoSpace : ErrCannotOpen;
+            PachiReset();
+            PachiRemoveFile();
             return e;
         }
         [gWriter startSessionAtSourceTime:kCMTimeZero];
@@ -109,7 +110,7 @@ extern "C"
     int PachiVideo_Append(const void* bgra, int frame)
     {
         if (gWriter == nil) { gError = ErrWriteFailed; return 2; }
-        if (gWriter.status == AVAssetWriterStatusFailed) { gError = ErrorOf(gWriter.error); return 2; }
+        if (gWriter.status == AVAssetWriterStatusFailed) { gError = PachiErrorOf(gWriter.error); return 2; }
         if (!gInput.readyForMoreMediaData) return 1;
 
         CVPixelBufferRef buf = NULL;
@@ -130,7 +131,8 @@ extern "C"
 
         BOOL ok = [gAdaptor appendPixelBuffer:buf withPresentationTime:CMTimeMake(frame, gFps)];
         CVPixelBufferRelease(buf);
-        if (!ok) { gError = ErrorOf(gWriter.error); return 2; }
+        if (!ok) { gError = PachiErrorOf(gWriter.error); return 2; }
+        gLastFrame = frame;
         return 0;
     }
 
@@ -138,10 +140,12 @@ extern "C"
     {
         if (gWriter == nil) { gError = ErrWriteFailed; gState = 2; return; }
         [gInput markAsFinished];
+        // 終わりの時刻を最後のコマの次にする（指定しないと最後のコマの長さが 0 になり、最後の姿が映らない）
+        if (gLastFrame >= 0) [gWriter endSessionAtSourceTime:CMTimeMake(gLastFrame + 1, gFps)];
         AVAssetWriter* w = gWriter;
         [w finishWritingWithCompletionHandler:^{
             if (w.status == AVAssetWriterStatusCompleted) gState = 1;
-            else { gError = ErrorOf(w.error); gState = 2; }
+            else { gError = PachiErrorOf(w.error); gState = 2; }
         }];
     }
 
@@ -153,8 +157,8 @@ extern "C"
     void PachiVideo_Cancel(void)
     {
         if (gWriter != nil && gWriter.status == AVAssetWriterStatusWriting) [gWriter cancelWriting];
-        Reset();
-        RemoveFile();
+        PachiReset();
+        PachiRemoveFile();
     }
 
     // 写真に保存。初回だけ「追加のみ」の許可を聞く。返事は PachiVideoBridge.OnSaved に "ok"／"denied"／"failed"
@@ -162,11 +166,11 @@ extern "C"
     {
         NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path]];
         [PHPhotoLibrary requestAuthorizationForAccessLevel:PHAccessLevelAddOnly handler:^(PHAuthorizationStatus st) {
-            if (st != PHAuthorizationStatusAuthorized && st != PHAuthorizationStatusLimited) { ReplySaved(@"denied"); return; }
+            if (st != PHAuthorizationStatusAuthorized && st != PHAuthorizationStatusLimited) { PachiReplySaved(@"denied"); return; }
             [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
                 [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:url];
             } completionHandler:^(BOOL ok, NSError* e) {
-                ReplySaved(ok ? @"ok" : @"failed");
+                PachiReplySaved(ok ? @"ok" : @"failed");
             }];
         }];
     }
