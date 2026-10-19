@@ -10,10 +10,10 @@ using UnityEngine.Rendering.Universal;
 namespace PachiMoji.EditorTools
 {
     /// <summary>
-    /// アプリの組み立てまわり：再生だけのシーン・仮のアイコン・iPhone 用の設定・組み立ての入口。
+    /// アプリの組み立てまわり：再生だけのシーン・アイコン・iPhone 用の設定・組み立ての入口。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiBuild.○○ で動かす。
     ///   MakePlayScene … アプリのシーンを作る（PachiApp を1つ置くだけ）
-    ///   MakeIcon      … 仮のアイコンを作る（本物は順番5で作る）
+    ///   MakeIcon      … アプリのアイコンを作る（虹の「脳汁」）
     ///   ConfigureCli  … iPhone 用の設定を当てる（手元用）
     ///   BuildIos      … GitHub の組み立て機（GameCI）から呼ばれる。設定を当てて Xcode の作りを書き出す
     /// </summary>
@@ -40,14 +40,40 @@ namespace PachiMoji.EditorTools
             });
         }
 
-        /// <summary>仮のアイコン：金になった「脳汁」を正方形で撮り、透明なしの 1024 四方 PNG にする</summary>
+        /// <summary>
+        /// アイコン：虹になり終えた「脳汁」を、ほぼ正面から枠いっぱいに撮り、透明なしの 1024 四方 PNG にする。
+        /// ホーム画面では 60px 前後に縮むので、字を大きく・背景は暗く静かにして、字だけが目に入るようにする
+        /// </summary>
         public static void MakeIcon()
         {
             RunCli(() =>
             {
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 var st = PachiStage.Build(new[] { "脳汁" }, 1f);
-                st.Evaluate(st.GoldAt + 0.5f);
+                // 2回転して止まり、揺れが落ち着いたころ
+                st.Evaluate(st.SpinAt + 2 * PachiStage.Spin + PachiStage.SpinRest + 1.2f);
+
+                // 文字：ほぼ正面。少しだけ下から・右から見て、厚みの側面をのぞかせる
+                st.text.rotation = Quaternion.Euler(7, -12, 0);
+                st.text.localScale = Vector3.one;
+                PachiText.SetHeat(st.rig, 0, 0, 0);   // 色相を流さない＝紫から緑まで、いちばん虹らしい並び
+                var b = st.text.GetComponent<MeshRenderer>().bounds;
+                float fitH = Mathf.Max(b.size.x, b.size.y) * 1.1f;   // 角丸で欠けないよう、四隅に少し余白
+                float dist = fitH * 0.5f / Mathf.Tan(st.cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                st.cam.transform.position = b.center + new Vector3(0, -fitH * 0.08f, -dist);
+                st.cam.transform.LookAt(b.center);
+
+                // 背景：暗めの虹。稲妻・光の筋・白い中心は消して、字を主役にする
+                var cam = st.cam.transform;
+                var bg = cam.Find("Background").GetComponent<MeshRenderer>().sharedMaterial;
+                bg.SetFloat("_Mode", 1);
+                bg.SetFloat("_Gain", 0.22f);
+                bg.SetFloat("_Core", 0.25f);
+                bg.SetFloat("_Bolts", 0);
+                bg.SetFloat("_Sparks", 0.4f);
+                bg.SetFloat("_Rays", 0);
+                cam.Find("Rays").GetComponent<MeshRenderer>().sharedMaterial.SetFloat("_Rays", 0);
+                cam.Find("Flash").GetComponent<MeshRenderer>().sharedMaterial.SetColor("_Color", new Color(0, 0, 0, 0));
                 // 2倍で描いて縮める（ギザギザを消す）
                 var big = new RenderTexture(2048, 2048, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
                 var small = new RenderTexture(1024, 1024, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
