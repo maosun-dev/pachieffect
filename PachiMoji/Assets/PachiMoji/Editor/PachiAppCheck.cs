@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using TMPro;
+using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
 
 namespace PachiMoji.EditorTools
@@ -92,6 +95,9 @@ namespace PachiMoji.EditorTools
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_changed.png"), new EffectSettings
                     { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho, From = Tier.Gold, To = Tier.Rainbow });
+
+                // 動画の書き出し（PNG の版で、アプリと同じ VideoExporter を動かす）
+                CheckExport(outDir);
             }
             catch (Exception e)
             {
@@ -206,6 +212,141 @@ namespace PachiMoji.EditorTools
             screen.Show(true);
             screen.SetSlide(0);
             RenderUi(rt, path, uiCam);
+        }
+
+        // ───────── 動画の書き出し ─────────
+
+        static void CheckExport(string outDir)
+        {
+            // 印の絵：640×128、四隅は透明、真ん中の行に字がある
+            var wm = Resources.Load<Texture2D>("Export/Watermark");
+            Expect(wm != null && wm.width == 640 && wm.height == 128, "印の絵が 640×128");
+            if (wm != null)
+            {
+                Expect(wm.GetPixel(0, 0).a == 0 && wm.GetPixel(639, 0).a == 0 && wm.GetPixel(0, 127).a == 0 && wm.GetPixel(639, 127).a == 0, "印の四隅が透明");
+                bool ink = false;
+                for (int x = 0; x < 640; x++) ink |= wm.GetPixel(x, 64).a > 0.5f;
+                Expect(ink, "印に字がある");
+            }
+
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // 最後まで書き出す：コマ数・％・最後の姿と印
+            string dir = Path.Combine(outDir, "export_frames");
+            var ex = new VideoExporter(Words, new EffectSettings(), true, new PngVideoWriter(), dir);
+            Expect(ex.Start() == ExportError.None, "書き出しを始められる");
+            var pct = RunExport(ex);
+            Expect(ex.Status == ExportStatus.Done, "書き出しが最後まで行く（" + ex.Status + " " + ex.Error + "）");
+            var files = Frames(dir);
+            Debug.Log($"[PachiAppCheck] 書き出し コマ {files.Length}／{ex.TotalFrames} 長さ {ex.Duration:F2} 秒");
+            Expect(files.Length == ex.TotalFrames && ex.TotalFrames == ExportPlan.FrameCount(ex.Duration), "コマ数が終わりの時刻まで");
+            Expect(ex.Percent == 100, "終わったら 100%");
+            bool up = true;
+            for (int i = 1; i < pct.Count; i++) up &= pct[i] >= pct[i - 1];
+            Expect(up, "％が下がらない");
+            Expect(ex.Preview != null && ex.Preview.width == ExportPlan.Width && ex.Preview.height == ExportPlan.Height, "見せる板が 1080×1920");
+            ex.Dispose();
+            // 数える基準は1回目のあと（1回目で URP が 1080×1920 用の作業用の板と材質を作り、使い回すため）。2回目からは増えないこと
+            int go0 = CountSceneObjects(), mat0 = Count<Material>(), mesh0 = Count<Mesh>(), rt0 = Count<RenderTexture>();
+            if (files.Length > 0)
+            {
+                File.Copy(files[files.Length - 1], Path.Combine(outDir, "export_last.png"), true);
+                // 演出は真っ暗から始まり、0.3 秒ごろにプチュンの閃光で白く飛ぶ
+                Expect(files.Length > 10 && Brightness(files[10], null) > 0.5f, "10コマ目（プチュンの閃光）が明るい");
+                Expect(Brightness(files[files.Length / 2], null) > 0.01f, "真ん中のコマが真っ黒でない");
+            }
+
+            // 印なし：印の範囲の見た目が変わる
+            string dirNo = Path.Combine(outDir, "export_frames_nomark");
+            var exNo = new VideoExporter(Words, new EffectSettings(), false, new PngVideoWriter(), dirNo);
+            Expect(exNo.Start() == ExportError.None, "印なしの書き出しを始められる");
+            RunExport(exNo);
+            exNo.Dispose();
+            var filesNo = Frames(dirNo);
+            if (files.Length > 0 && filesNo.Length == files.Length && wm != null)
+            {
+                var r = ExportPlan.WatermarkRect(wm.width, wm.height);
+                float a = Brightness(files[files.Length - 1], r), b = Brightness(filesNo[filesNo.Length - 1], r);
+                Debug.Log($"[PachiAppCheck] 印の範囲の明るさ あり {a:F3} なし {b:F3}");
+                Expect(Mathf.Abs(a - b) > 0.05f, "印ありとなしで右下が違う");
+            }
+            else Expect(false, "印なしのコマ数");
+            DeleteDir(dir); DeleteDir(dirNo);   // 1回で 1GB 近くになるので残さない
+
+            // やめる：作りかけが消える
+            var exC = new VideoExporter(Words, new EffectSettings(), true, new PngVideoWriter(), dir);
+            exC.Start();
+            for (int i = 0; i < 30; i++) { exC.Step(); AsyncGPUReadback.WaitAllRequests(); }
+            exC.Cancel();
+            Expect(exC.Status == ExportStatus.Cancelled && !Directory.Exists(dir), "やめたら作りかけが消える");
+            exC.Dispose();
+
+            // 書いている途中で失敗：知らせの種類と、作りかけが消える
+            var exF = new VideoExporter(Words, new EffectSettings(), true, new FailingWriter(), dir);
+            exF.Start();
+            RunExport(exF);
+            Expect(exF.Status == ExportStatus.Failed && exF.Error == ExportError.WriteFailed && !Directory.Exists(dir), "途中で失敗したら作りかけが消える");
+            exF.Dispose();
+
+            // 空き容量が無い：始めない
+            var exS = new VideoExporter(Words, new EffectSettings(), true, new FullDiskWriter(), dir);
+            Expect(exS.Start() == ExportError.NoSpace && !Directory.Exists(dir), "空き容量が無ければ始めない");
+            exS.Dispose();
+
+            int go1 = CountSceneObjects(), mat1 = Count<Material>(), mesh1 = Count<Mesh>(), rt1 = Count<RenderTexture>();
+            Debug.Log($"[PachiAppCheck] 書き出しの前後 物 {go0}→{go1} 材質 {mat0}→{mat1} メッシュ {mesh0}→{mesh1} 板 {rt0}→{rt1}");
+            Expect(go1 == go0 && mat1 == mat0 && mesh1 == mesh0 && rt1 == rt0, "書き出しをくり返しても物が残らない");
+        }
+
+        static List<int> RunExport(VideoExporter ex)
+        {
+            var pct = new List<int>();
+            for (int guard = 0; ex.Status == ExportStatus.Running && guard < 5000; guard++)
+            {
+                ex.Step();
+                AsyncGPUReadback.WaitAllRequests();
+                pct.Add(ex.Percent);
+            }
+            return pct;
+        }
+
+        static string[] Frames(string dir)
+        {
+            if (!Directory.Exists(dir)) return new string[0];
+            var f = Directory.GetFiles(dir, "f*.png");
+            Array.Sort(f, StringComparer.Ordinal);
+            return f;
+        }
+
+        static void DeleteDir(string dir)
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+
+        // PNG の明るさの平均（範囲 r を決めればその中だけ、左下原点の画素）
+        static float Brightness(string png, Rect? r)
+        {
+            var tex = new Texture2D(2, 2);
+            tex.LoadImage(File.ReadAllBytes(png));
+            var area = r ?? new Rect(0, 0, tex.width, tex.height);
+            int x0 = (int)area.x, y0 = (int)area.y, w = (int)area.width, h = (int)area.height;
+            var px = tex.GetPixels(x0, y0, w, h);
+            float sum = 0;
+            foreach (var c in px) sum += c.grayscale;
+            UnityEngine.Object.DestroyImmediate(tex);
+            return sum / px.Length;
+        }
+
+        // 10コマ目で書けなくなる書き手
+        class FailingWriter : PngVideoWriter
+        {
+            public override WriteResult Append(NativeArray<byte> bgra, int frame) => frame == 10 ? WriteResult.Failed : base.Append(bgra, frame);
+        }
+
+        // 空き容量が無い書き手
+        class FullDiskWriter : PngVideoWriter
+        {
+            public override long FreeBytes(string dir) => 0;
         }
 
         // 画面のカメラで板へ描いて保存する

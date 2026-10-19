@@ -4,8 +4,10 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.UI;
 
 namespace PachiMoji.EditorTools
 {
@@ -14,6 +16,7 @@ namespace PachiMoji.EditorTools
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiBuild.○○ で動かす。
     ///   MakePlayScene … アプリのシーンを作る（PachiApp を1つ置くだけ）
     ///   MakeIcon      … アプリのアイコンを作る（虹の「脳汁」）
+    ///   MakeWatermark … 動画の右下に重ねる印「脳汁メーカー」を作る
     ///   ConfigureCli  … iPhone 用の設定を当てる（手元用）
     ///   BuildIos      … GitHub の組み立て機（GameCI）から呼ばれる。設定を当てて Xcode の作りを書き出す
     /// </summary>
@@ -23,6 +26,8 @@ namespace PachiMoji.EditorTools
         public const string BundleId = "com.maosundev.noujiru";
         public const string AppName = "脳汁メーカー";
         public const string IconPath = "Assets/PachiMoji/Icons/AppIcon.png";
+        public const string WatermarkPath = "Assets/PachiMoji/Resources/Export/Watermark.png";
+        public const int WatermarkW = 640, WatermarkH = 128;
         // Shader.Find で探すだけのシェーダーは、ここに並べて「いつも入れる」にしないとアプリから抜け落ちる
         public static readonly string[] Shaders =
             { "PachiMoji/Burst", "PachiMoji/Flash", "PachiMoji/Glint", "PachiMoji/Metal", "PachiMoji/Rays", "PachiMoji/Spark" };
@@ -92,6 +97,74 @@ namespace PachiMoji.EditorTools
                 File.WriteAllBytes(IconPath, tex.EncodeToPNG());
                 AssetDatabase.ImportAsset(IconPath);
                 Debug.Log("[PachiBuild] アイコンを作った " + IconPath);
+            });
+        }
+
+        /// <summary>
+        /// 動画の印：Reggae One の「脳汁メーカー」1行を、透明の背景に 640×128 で描く。
+        /// どの場面の上でも読めるよう、クロム（上が白・下が灰）に黒いフチと影。飾りは付けず、演出の邪魔をしない
+        /// </summary>
+        public static void MakeWatermark()
+        {
+            RunCli(() =>
+            {
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                var rt = new RenderTexture(WatermarkW, WatermarkH, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                var cam = MainScreen.CreateUiCamera();
+                cam.backgroundColor = new Color(0, 0, 0, 0);
+                cam.targetTexture = rt;
+                var go = new GameObject("Canvas", typeof(Canvas));
+                var canvas = go.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = cam;
+                canvas.planeDistance = 1;
+                var label = new GameObject("Label", typeof(RectTransform));
+                var lr = (RectTransform)label.transform;
+                lr.SetParent(go.transform, false);
+                lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
+                lr.offsetMin = new Vector2(16, 0); lr.offsetMax = new Vector2(-16, 0);
+                var t = label.AddComponent<TextMeshProUGUI>();
+                t.font = UiTheme.Display;
+                t.text = "脳汁メーカー";
+                t.alignment = TextAlignmentOptions.Center;
+                t.textWrappingMode = TextWrappingModes.NoWrap;
+                t.enableAutoSizing = true; t.fontSizeMin = 20; t.fontSizeMax = 200;
+                t.color = Color.white;
+                t.enableVertexGradient = true;
+                t.colorGradient = new VertexGradient(Color.white, Color.white, UiTheme.Muted, UiTheme.Muted);
+                var mat = t.fontMaterial;   // この字だけの材質（共有の材質は変えない）
+                mat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.3f);
+                mat.SetColor(ShaderUtilities.ID_OutlineColor, Color.black);
+                mat.EnableKeyword(ShaderUtilities.Keyword_Underlay);
+                mat.SetColor(ShaderUtilities.ID_UnderlayColor, Color.black);
+                mat.SetFloat(ShaderUtilities.ID_UnderlayOffsetX, 0.6f);
+                mat.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, -0.6f);
+                mat.SetFloat(ShaderUtilities.ID_UnderlayDilate, 0.5f);   // 影を太らせて、白い場面でも字の形が浮く
+                mat.SetFloat(ShaderUtilities.ID_UnderlaySoftness, 0.3f);
+                foreach (var tr in go.GetComponentsInChildren<Transform>(true)) tr.gameObject.layer = MainScreen.UiLayer;
+
+                for (int i = 0; i < 2; i++) { Canvas.ForceUpdateCanvases(); cam.Render(); }   // 1回目は字の形ができる前のことがある
+                var tex = new Texture2D(WatermarkW, WatermarkH, TextureFormat.RGBA32, false);
+                var prev = RenderTexture.active;
+                RenderTexture.active = rt;
+                tex.ReadPixels(new Rect(0, 0, WatermarkW, WatermarkH), 0, 0);
+                tex.Apply();
+                RenderTexture.active = prev;
+                cam.targetTexture = null;
+                rt.Release();
+                Directory.CreateDirectory(Path.GetDirectoryName(WatermarkPath));
+                File.WriteAllBytes(WatermarkPath, tex.EncodeToPNG());
+                AssetDatabase.ImportAsset(WatermarkPath);
+                var imp = (TextureImporter)AssetImporter.GetAtPath(WatermarkPath);
+                imp.textureType = TextureImporterType.Default;
+                imp.mipmapEnabled = false;
+                imp.npotScale = TextureImporterNPOTScale.None;   // 640×128 のまま（2の累乗に丸めない）
+                imp.wrapMode = TextureWrapMode.Clamp;
+                imp.alphaIsTransparency = true;
+                imp.textureCompression = TextureImporterCompression.Uncompressed;
+                imp.isReadable = true;   // 手元確認で画素を見る
+                imp.SaveAndReimport();
+                Debug.Log("[PachiBuild] 印を作った " + WatermarkPath);
             });
         }
 
