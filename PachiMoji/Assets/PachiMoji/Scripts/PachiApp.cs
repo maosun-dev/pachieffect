@@ -145,6 +145,7 @@ namespace PachiMoji
         void OnExportPressed()
         {
             if (state != AppState.Finished || exporter != null) return;
+            if (ui.EndNotice.text == ExportGate.NotWatched) ui.EndNotice.text = "";   // 見直すので、見なかった知らせは消す
             var gate = Gate();
             switch (gate)
             {
@@ -174,10 +175,7 @@ namespace PachiMoji
             if (state != AppState.Finished || exporter != null) return;
             var gate = Gate();
             ui.SetExportReady(gate == GateAction.ExportNow || gate == GateAction.ShowAd);
-            string msg = ExportGate.Message(gate);
-            if (msg != "") ui.EndNotice.text = msg;
-            else if (ui.EndNotice.text == ExportGate.Message(GateAction.NeedNetwork) || ui.EndNotice.text == ExportGate.Message(GateAction.Wait))
-                ui.EndNotice.text = "";   // 直ったら、待ち・ネットの知らせだけ消す（失敗の知らせは残す）
+            ui.EndNotice.text = ExportGate.NoticeFor(gate, ui.EndNotice.text);
         }
 
         // 買ったものが変わった：設定の買い物を描き直し、広告を消した人はすぐバナーを消す

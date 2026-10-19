@@ -63,7 +63,10 @@ namespace PachiMoji.EditorTools
                 string gvhPath = Path.Combine(root, "PachiMoji/ProjectSettings/GvhProjectSettings.xml");
                 string gvh = File.Exists(gvhPath) ? File.ReadAllText(gvhPath) : "";
                 Expect(gvh.Contains("name=\"Google.IOSResolver.UseProjectSettings\" value=\"True\""), "iOS の部品の設定はプロジェクトのもの");
-                Expect(gvh.Contains("name=\"Google.IOSResolver.CocoapodsInstallEnabled\" value=\"False\""), "Linux では pod install しない");
+                Expect(gvh.Contains("name=\"Google.IOSResolver.SkipPodInstallWhenUsingWorkspaceIntegration\" value=\"True\""), "Linux では pod install しない");
+                Expect(gvh.Contains("name=\"Google.IOSResolver.AutoPodToolInstallInEditor\" value=\"False\""), "Linux で CocoaPods を入れようとしない");
+                Expect(gvh.Contains("name=\"Google.IOSResolver.SwiftPackageManagerEnabled\" value=\"False\""), "部品は CocoaPods で取る（Swift の部品の仕組みは使わない）");
+                Expect(!gvh.Contains("CocoapodsInstallEnabled"), "実在しない設定名を書かない");
                 Expect(gvh.Contains("name=\"Google.IOSResolver.CocoapodsIntegrationMethod\" value=\"2\""), "xcworkspace でつなぐ");
                 string wf = File.ReadAllText(Path.Combine(root, ".github/workflows/ios-testflight.yml"));
                 Expect(wf.Contains("production:") && wf.Contains("-pachiProduction"), "ストアに出す版の印（production）");

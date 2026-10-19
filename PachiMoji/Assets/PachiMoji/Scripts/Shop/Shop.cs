@@ -68,6 +68,7 @@ namespace PachiMoji
                 store.OnPurchasesFetched += orders =>
                 {
                     foreach (var o in orders.ConfirmedOrders) GrantAll(o);
+                    if (restoring) FinishRestore();   // 復元は、買ったものの一覧が届いてから結果を出す
                 };
                 store.OnPurchasesFetchFailed += f => Debug.LogWarning("[Shop] 買ったものを取れない " + f.Message);
                 await store.Connect();
@@ -96,18 +97,22 @@ namespace PachiMoji
         {
             if (store == null || State == ShopState.Connecting) return;
             restoring = true;
+            Notice?.Invoke("購入を確かめています…");
             store.RestoreTransactions((ok, error) =>
             {
+                // 成功の返事は、買ったものの一覧（OnPurchasesFetched）より先に来る。結果は一覧が届いてから出す
+                if (ok) return;
                 restoring = false;
-                if (!ok)
-                {
-                    Debug.LogWarning("[Shop] 復元できない " + error);
-                    Notice?.Invoke("復元できませんでした。ネットにつないで、もう一度お試しください");
-                    return;
-                }
-                bool any = Owned.Owns(ProductIds.NoMark) || Owned.Owns(ProductIds.NoAds);
-                Notice?.Invoke(any ? "購入を復元しました" : "復元できる購入はありませんでした");
+                Debug.LogWarning("[Shop] 復元できない " + error);
+                Notice?.Invoke("復元できませんでした。ネットにつないで、もう一度お試しください");
             });
+        }
+
+        void FinishRestore()
+        {
+            restoring = false;
+            bool any = Owned.Owns(ProductIds.NoMark) || Owned.Owns(ProductIds.NoAds);
+            Notice?.Invoke(any ? "購入を復元しました" : "復元できる購入はありませんでした");
         }
 
         /// <summary>買ったものに足して端末に保存し、Changed で知らせる（届いた買い物と手元確認の入口）</summary>

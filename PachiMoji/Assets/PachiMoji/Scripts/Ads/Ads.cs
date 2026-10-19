@@ -114,6 +114,13 @@ namespace PachiMoji
             }
             if (rewarded == null || !rewarded.CanShowAd())
             {
+                // 読み込んでから時間が経つと（約1時間）期限が切れて出せない。捨てて読み直す
+                if (rewarded != null)
+                {
+                    rewarded.Destroy();
+                    rewarded = null;
+                    if (rewardedWanted) LoadRewarded();
+                }
                 done(false);
                 return;
             }

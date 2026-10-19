@@ -18,6 +18,19 @@ namespace PachiMoji
             return ad == AdState.Ready ? GateAction.ShowAd : GateAction.Wait;
         }
 
+        /// <summary>
+        /// 終わりの画面の知らせを、今の判定で決め直す。広告を途中で閉じた知らせ（NotWatched）は、
+        /// ネットが切れたとき以外は残す（次に「書き出す」を押したら PachiApp が消す）。
+        /// 待ち・ネットの知らせは、直ったら消す。ほかの知らせ（書き出しの失敗など）は残す
+        /// </summary>
+        public static string NoticeFor(GateAction a, string current)
+        {
+            string msg = Message(a);
+            if (current == NotWatched && a != GateAction.NeedNetwork) return NotWatched;
+            if (msg != "") return msg;
+            return current == Message(GateAction.NeedNetwork) || current == Message(GateAction.Wait) ? "" : current;
+        }
+
         public static string Message(GateAction a) => a switch
         {
             GateAction.NeedNetwork => "ネットにつなぐと書き出せます",
