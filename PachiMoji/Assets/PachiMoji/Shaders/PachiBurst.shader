@@ -15,6 +15,7 @@ Shader "PachiMoji/Burst"
         _Sparks ("Sparks", Float) = 1
         _Core ("Core Glow", Float) = 1
         _Aberration ("Chromatic Aberration", Float) = 0.012
+        _HueRot ("Hue Rotation (deg, Blue mode)", Float) = 0
         _Gain ("Gain", Float) = 1
         _Rays ("Ray Burst", Float) = 0
         _RayReach ("Ray Reach", Float) = 2
@@ -32,7 +33,7 @@ Shader "PachiMoji/Burst"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 float4 _Center;
-                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain, _Rays, _RayReach, _Aspect;
+                float _Mode, _T, _Bolts, _Sparks, _Core, _Aberration, _Gain, _Rays, _RayReach, _Aspect, _HueRot;
             CBUFFER_END
             struct A { float4 pos : POSITION; float2 uv : TEXCOORD0; };
             struct V { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -184,6 +185,14 @@ Shader "PachiMoji/Burst"
 
                 // まわりを少し暗く
                 c *= lerp(1.0, 0.6, saturate(r * 0.8 - 0.35));
+
+                // 最初の背景の色：青の作りのまま、灰色の軸のまわりに色相を回す（明るさと白い芯はそのまま）
+                if (_Mode > 1.5 && abs(_HueRot) > 0.01)
+                {
+                    float a = radians(_HueRot), cs = cos(a), sn = sin(a);
+                    float3 k = float3(0.57735, 0.57735, 0.57735);
+                    c = max(0, c * cs + cross(k, c) * sn + k * dot(k, c) * (1 - cs));
+                }
                 return half4(c * _Gain, 1);
             }
             ENDHLSL

@@ -89,9 +89,10 @@ namespace PachiMoji
             return m;
         }
 
-        // 部位ごとの色（表の面・細い線・黒・外フチ・側面）。null は虹
-        static string[] Ramps(Finish f) => f switch
+        // 部位ごとの色（表の面・細い線・黒・外フチ・側面）。null は虹。tint（#RRGGBB）を渡すと銀に色を乗せる
+        static string[] Ramps(Finish f, string tint = null) => f switch
         {
+            Finish.Silver when tint != null => new[] { "silver@" + tint, "silverLine@" + tint, "black", "silver@" + tint, "silverSide@" + tint },
             Finish.Silver => new[] { "silver", "silverLine", "black", "silver", "silverSide" },
             Finish.Rainbow => new[] { null, "silverLine", "black", "goldRim", "goldSide" },
             _ => new[] { "gold", "goldLine", "black", "goldRim", "goldSide" },
@@ -100,10 +101,11 @@ namespace PachiMoji
         /// <summary>
         /// 見た目を切り替える。from の見た目の上に、左から wipe（0〜1）の割合まで to の見た目を塗る。
         /// wipe=0 なら from だけ、1 なら to だけ。glow は境目の光の帯の強さ。
+        /// silverTint（#RRGGBB）を渡すと、銀の見た目にその色を乗せる（最初の文字色）
         /// </summary>
-        public static void SetLook(Rig rig, Finish from, Finish to, float wipe, float glow)
+        public static void SetLook(Rig rig, Finish from, Finish to, float wipe, float glow, string silverTint = null)
         {
-            var ra = Ramps(from); var rb = Ramps(to);
+            var ra = Ramps(from, silverTint); var rb = Ramps(to, silverTint);
             float wx = wipe <= 0 ? -100000 : wipe >= 1 ? 100000 : Mathf.Lerp(rig.minX, rig.maxX, wipe);
             for (int i = 0; i < rig.mats.Length; i++)
             {

@@ -214,7 +214,7 @@ namespace PachiMoji
                 return;
             }
             string key = string.Join("\n", check.Lines) + "|" + settings.FontName + settings.From + settings.To
-                         + settings.SparksOn + settings.Light + settings.Size;
+                         + settings.SparksOn + settings.Light + settings.Size + settings.FirstText + settings.FirstBack;
             if (stage.Effect == null || key != builtKey)
             {
                 stage.Build(check.Lines, settings, ScreenPx);

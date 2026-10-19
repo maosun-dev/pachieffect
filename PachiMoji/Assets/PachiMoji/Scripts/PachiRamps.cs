@@ -33,9 +33,21 @@ namespace PachiMoji
 
         static readonly Dictionary<string, Texture2D> cache = new Dictionary<string, Texture2D>();
 
+        /// <summary>
+        /// 対応表を返す。「silver@#2A7BFF」のように @ のあとに色を書くと、その対応表の明るさの並び
+        /// （ギラつきの帯と暗い谷）を保ったまま、暗いところは色の芯へ、明るいところは白へ寄せた色にする
+        /// </summary>
         public static Texture2D Get(string name)
         {
             if (cache.TryGetValue(name, out var tex) && tex != null) return tex;
+            int at = name.IndexOf('@');
+            if (at >= 0)
+            {
+                tex = Tinted(Get(name.Substring(0, at)), name.Substring(at + 1));
+                tex.name = "Ramp_" + name;
+                cache[name] = tex;
+                return tex;
+            }
             var keys = Keys[name];
             tex = new Texture2D(256, 1, TextureFormat.RGBA32, false, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, name = "Ramp_" + name };
             var px = new Color[256];
@@ -52,6 +64,24 @@ namespace PachiMoji
             tex.SetPixels(px);
             tex.Apply();
             cache[name] = tex;
+            return tex;
+        }
+
+        static Texture2D Tinted(Texture2D src, string hex)
+        {
+            ColorUtility.TryParseHtmlString(hex, out var core);
+            var a = src.GetPixels();
+            var px = new Color[a.Length];
+            for (int i = 0; i < a.Length; i++)
+            {
+                float l = a[i].grayscale;
+                // 0.55 までは黒 → 色の芯、そこから上は色の芯 → 白（ツヤの帯は白く残る）
+                px[i] = l < 0.55f ? core * (l / 0.55f) : Color.Lerp(core, Color.white, Mathf.Pow((l - 0.55f) / 0.45f, 1.5f));
+                px[i].a = 1;
+            }
+            var tex = new Texture2D(src.width, 1, TextureFormat.RGBA32, false, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            tex.SetPixels(px);
+            tex.Apply();
             return tex;
         }
     }

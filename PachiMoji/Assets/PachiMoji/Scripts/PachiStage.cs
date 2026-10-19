@@ -57,6 +57,8 @@ namespace PachiMoji
         /// <summary>ドンの火花を出すか（好みで消せる）</summary>
         public bool SparksOn = true;
         EffectSettings settings;
+        string firstTint;   // 最初の文字色（null は銀のまま）
+        float firstHue;     // 最初の背景の色相の回し（度、0 は青のまま）
         PachiText.Finish land;   // ドンで着地するときの色（昇格のはじまりの色）
         Transform bg, flashQuad, raysQuad; float aspect;
         const float IdleAspect = 2.2f;   // 待ちの姿の背景の板の横÷縦（入力の板より上の、横長の範囲を覆う）
@@ -79,6 +81,8 @@ namespace PachiMoji
             st.settings = settings;
             st.SparksOn = settings.SparksOn;
             st.land = FinishOf(settings.From);
+            st.firstTint = settings.FirstColorsApply ? FirstColors.TextBase(settings.FirstText) : null;
+            st.firstHue = settings.FirstColorsApply ? FirstColors.BackHue(settings.FirstBack) : 0;
             string font = settings.FontName;
 
             // 文字（基本の向き：斜め下から見上げて側面を見せる）
@@ -360,6 +364,8 @@ namespace PachiMoji
             float shake = 0;
             Color flash = new Color(0, 0, 0, 0);
             var look = (PachiText.Finish.Silver, PachiText.Finish.Silver, 0f);
+            string tint = null;   // 銀の見た目に乗せる色（ドンの段だけ）
+            float bgHue = 0;      // 青の背景の色相の回し（ドンの段だけ）
             float lookGlow = 1.5f;
             float white = 0, hue = 0;
             float bgMode = 0, bgGain = 1, bgCore = 1, bgBolts = 1, bgSparks = 1, bgRays = 0, bgReach = 2, fgRays = 0, fgReach = 2;
@@ -470,6 +476,7 @@ namespace PachiMoji
                 // 今の色：銀 → 金（白飛びのあと一瞬で切り替える）→ 切り裂かれて灰色 → 一気に虹
                 var fin = rain ? PachiText.Finish.Rainbow : g.snapped ? PachiText.Finish.Gold : land;
                 look = (fin, fin, 0f);
+                tint = firstTint;
 
                 float pre = rain ? 0 : g.pre;
                 float pop = rain ? Mathf.Exp(-rx * 4) : g.snapped ? Mathf.Exp(-g.x * 5) : 0;
@@ -485,7 +492,7 @@ namespace PachiMoji
                 if (!rain && !cut && (g.snapped || goldLand) && gx > 0.2f && gx < 0.65f) { look = (fin, fin, (gx - 0.2f) / 0.45f); lookGlow = 2.8f; }
 
                 // 背景：銀は青、金は炎、虹は虹（ときどき青・炎に切り替わり続ける）
-                if (fin == PachiText.Finish.Silver) bgMode = 2;
+                if (fin == PachiText.Finish.Silver) { bgMode = 2; bgHue = firstHue; }
                 else if (fin == PachiText.Finish.Gold) bgMode = 0;
                 else
                 {
@@ -553,7 +560,7 @@ namespace PachiMoji
             }
             text.rotation = rot;
             text.localScale = Vector3.one * scale;
-            PachiText.SetLook(rig, look.Item1, look.Item2, look.Item3, lookGlow);
+            PachiText.SetLook(rig, look.Item1, look.Item2, look.Item3, lookGlow, tint);
             PachiText.SetHeat(rig, white, hue, gray);
             for (int i = 0; i < rig.glints.Count; i++)
             {
@@ -577,6 +584,7 @@ namespace PachiMoji
 
             bgMat.SetFloat("_T", bt);
             bgMat.SetFloat("_Mode", bgMode);
+            bgMat.SetFloat("_HueRot", bgHue);
             bgMat.SetFloat("_Gain", bgGain);
             bgMat.SetFloat("_Core", bgCore);
             bgMat.SetFloat("_Bolts", bgBolts);

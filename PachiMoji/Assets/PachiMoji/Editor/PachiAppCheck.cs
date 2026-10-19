@@ -84,6 +84,17 @@ namespace PachiMoji.EditorTools
                 Expect(EffectCatalog.Get("知らない").Id == "oudou", "知らない ID は王道昇格");
                 Expect(EffectCatalog.All[0].RequiredProduct == null, "王道昇格は無料");
 
+                // 最初の文字色と背景：ドンで着地して金に変わる前（銀の段）の姿を、色の組み合わせごとに撮る
+                foreach (var (ft, fb) in new[] { (FirstText.Silver, FirstBack.Blue), (FirstText.Blue, FirstBack.Blue), (FirstText.Green, FirstBack.Green),
+                             (FirstText.Red, FirstBack.Red), (FirstText.Purple, FirstBack.Purple), (FirstText.Red, FirstBack.Green), (FirstText.Purple, FirstBack.Red) })
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    var st = PachiStage.Build(new[] { "残業", "確定です" }, 9f / 16, new EffectSettings { FirstText = ft, FirstBack = fb });
+                    st.Evaluate((st.ImpactEnd + st.GoldAt) / 2);
+                    Save(st.cam, 360, 640, Path.Combine(outDir, $"first_{ft}_{fb}.png"));
+                    st.Dispose();
+                }
+
                 // 虹で終わる演出は、最後の 0.4 秒の背景が虹のまま（余韻の青・炎への切り替えで終わらない）。動画の最後の絵になるため
                 foreach (var from in new[] { Tier.Silver, Tier.Gold, Tier.Rainbow })
                 {
