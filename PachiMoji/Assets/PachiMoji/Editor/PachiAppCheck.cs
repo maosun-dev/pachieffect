@@ -84,6 +84,22 @@ namespace PachiMoji.EditorTools
                 Expect(EffectCatalog.Get("知らない").Id == "oudou", "知らない ID は王道昇格");
                 Expect(EffectCatalog.All[0].RequiredProduct == null, "王道昇格は無料");
 
+                // 虹で終わる演出は、最後の 0.4 秒の背景が虹のまま（余韻の青・炎への切り替えで終わらない）。動画の最後の絵になるため
+                foreach (var from in new[] { Tier.Silver, Tier.Gold, Tier.Rainbow })
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    var st = PachiStage.Build(Words, 9f / 16, new EffectSettings { From = from, To = Tier.Rainbow });
+                    var bg = st.cam.transform.Find("Background").GetComponent<MeshRenderer>().sharedMaterial;
+                    bool rainbowEnd = true;
+                    for (float k = 0; k <= 0.4f; k += 1f / 30)
+                    {
+                        st.Evaluate(st.End - k);
+                        rainbowEnd &= Mathf.Approximately(bg.GetFloat("_Mode"), 1);
+                    }
+                    Expect(rainbowEnd, $"虹で終わる演出（{from}→虹）は最後の背景が虹");
+                    st.Dispose();
+                }
+
                 // 12文字（6文字×2行）がノッチのある機種の比率でも画面に収まる
                 var twelve = new[] { "脳汁ドバドバ", "激アツ確定だ" };
                 ShotEffect(720, 1560, Path.Combine(outDir, "fit_12_end.png"), twelve, e => e.Evaluate(e.Duration - 0.5f));

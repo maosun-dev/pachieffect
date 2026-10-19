@@ -20,6 +20,7 @@ namespace PachiMoji
     {
         // ───────── 時刻（秒） ─────────
         public const float Rumble = 1.25f;      // プチュンの終わり＝暗転の始まり
+        public const float EndHold = 0.4f;     // 虹の余韻の終わりに、背景を虹に固定しておく長さ（秒）
         public const float PuchunAt = 0.3f;     // 真っ暗から、青白い閃光が走る時刻
         public const float Tame = 1.3f;         // 暗転（無音）の長さ
         public const float RayLen = 0.6f;       // 最後のチラ見せのあと、文字の裏から光が吹き出す長さ
@@ -489,7 +490,8 @@ namespace PachiMoji
                 else
                 {
                     int[] cyc = { 1, 1, 1, 2, 1, 1, 0 };
-                    bgMode = cyc[(int)(t / 0.1f) % cyc.Length];
+                    // 最後の EndHold 秒は虹に固定する（動画の最後の絵が青や炎にならないように）
+                    bgMode = t >= End - EndHold ? 1 : cyc[(int)(t / 0.1f) % cyc.Length];
                     hue = (t - (rain ? RainbowAt : ImpactEnd)) * 0.25f;   // 虹になった時刻から色が流れる
                 }
                 bgRays = pop * (rain ? 2.0f : 1.4f); bgReach = 2.4f;
