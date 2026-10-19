@@ -166,6 +166,19 @@ namespace PachiMoji.EditorTools
                 ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_gold.png"), new EffectSettings { From = Tier.Gold },
                     sc => Expect(!sc.FirstColorsEnabled, "はじまりが金なら最初の色は押せない"), bottom: true);
 
+                // 課金：ストアにつなぐ前から、端末に残っていた買ったもので始まる。届いた買い物は記録して知らせる（本物の記録は元に戻す）
+                {
+                    string backup = PlayerPrefs.GetString("ent.owned", "");
+                    var shop = new Shop(new Entitlements(new string[0]));
+                    Expect(shop.State == ShopState.Connecting && shop.Owned.ShowAds && shop.PriceOf(ProductIds.NoAds) == null, "課金はつなぐ前の姿で始まる");
+                    bool changed = false;
+                    shop.Changed += () => changed = true;
+                    shop.Grant(ProductIds.NoAds);
+                    Expect(changed && !shop.Owned.ShowAds && !Entitlements.Load().ShowAds, "届いた買い物は記録して知らせる");
+                    PlayerPrefs.SetString("ent.owned", backup);
+                    PlayerPrefs.Save();
+                }
+
                 // 動画の書き出し（PNG の版で、アプリと同じ VideoExporter を動かす）
                 CheckExport(outDir);
             }
