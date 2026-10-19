@@ -8,7 +8,8 @@ using UnityEngine.UI;
 namespace PachiMoji
 {
     /// <summary>
-    /// 設定画面：火花・プチュンの光の色と大きさ・書体・昇格の範囲。黒い全面が下からせり上がる。
+    /// 設定画面：火花・プチュンの光の色と大きさ・書体・昇格の範囲・最初の文字色と背景。黒い全面が下からせり上がる。
+    /// 項目は縦に動かせる（見出しと「もどる」は動かない）。
     /// 選んでいるものは金の文字と細い金の線。変えたらすぐ onChanged を呼ぶ（保存は PachiApp）。
     /// 買い物の項目は順番4で足す。
     /// </summary>
@@ -19,6 +20,7 @@ namespace PachiMoji
         EffectSettings settings;
         Action<EffectSettings> onChanged;
         RectTransform rail; RectTransform[] medals; TMP_Text rangeLabel;
+        ScrollRect scroll; CanvasGroup firstGroup; TMP_Text firstNote;
         static readonly string[] TierNames = { "銀", "金", "虹" };
 
         public static SettingsScreen Build(RectTransform canvasRoot, Rect safePx, Vector2 screenPx,
@@ -42,22 +44,55 @@ namespace PachiMoji
             MainScreen.Place(title, top, new Vector2(0, -32), new Vector2(200, 44));
             MainScreen.Label(title, "設定", UiTheme.Display, 26, UiTheme.Chrome);
 
-            float y = -92;
-            m.Choice(safe, ref y, "火花", new[] { "あり", "なし" }, null, settings.SparksOn ? 0 : 1, 150,
+            // 見出しより下を、縦に動かせる範囲にする
+            var view = MainScreen.Rect(safe, "Scroll");
+            view.anchorMin = Vector2.zero; view.anchorMax = Vector2.one;
+            view.offsetMin = Vector2.zero; view.offsetMax = new Vector2(0, -64);
+            view.gameObject.AddComponent<Image>().color = Color.clear;   // 余白をなぞっても動かせるように
+            view.gameObject.AddComponent<RectMask2D>();
+            var content = MainScreen.Rect(view, "Content");
+            content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1);
+            content.anchoredPosition = Vector2.zero;
+            m.scroll = view.gameObject.AddComponent<ScrollRect>();
+            m.scroll.viewport = view;
+            m.scroll.content = content;
+            m.scroll.horizontal = false;
+            m.scroll.movementType = ScrollRect.MovementType.Elastic;
+            m.scroll.scrollSensitivity = 20;
+
+            float y = -28;
+            var parent = content;
+            m.Choice(parent, ref y, "火花", new[] { "あり", "なし" }, null, settings.SparksOn ? 0 : 1, 150,
                 i => settings.SparksOn = i == 0);
-            m.Choice(safe, ref y, "プチュンの光の色", new[] { "青白", "金", "赤", "虹" },
+            m.Choice(parent, ref y, "プチュンの光の色", new[] { "青白", "金", "赤", "虹" },
                 new[] { UiTheme.Hex(0x8CBFFF), UiTheme.Hex(0xFFC74D), UiTheme.Hex(0xFF4033), Color.clear },
                 (int)settings.Light, 80, i => settings.Light = (LightColor)i);
-            m.Choice(safe, ref y, "プチュンの光の大きさ", new[] { "小", "中", "大" }, null, (int)settings.Size, 104,
+            m.Choice(parent, ref y, "プチュンの光の大きさ", new[] { "小", "中", "大" }, null, (int)settings.Size, 104,
                 i => settings.Size = (LightSize)i);
-            m.Choice(safe, ref y, "書体", new[] { "ポップ", "明朝" }, null, (int)settings.Font, 150,
+            m.Choice(parent, ref y, "書体", new[] { "ポップ", "明朝" }, null, (int)settings.Font, 150,
                 i => settings.Font = (TextFont)i);
-            m.Range(safe, y);
+            m.Range(parent, ref y);
+            m.First(parent, ref y);
+            content.sizeDelta = new Vector2(0, -y + 24);
 
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
             m.Show(false);
             return m;
         }
+
+        /// <summary>縦の位置（1＝いちばん上、0＝いちばん下）</summary>
+        public void ScrollTo(float normalized)
+        {
+            Canvas.ForceUpdateCanvases();
+            scroll.verticalNormalizedPosition = normalized;
+        }
+
+        /// <summary>中身が見える範囲より長く、縦に動かせるか</summary>
+        public bool Scrollable => scroll.content.rect.height > scroll.viewport.rect.height;
+
+        /// <summary>最初の色を選べるか（昇格のはじまりが銀のときだけ）</summary>
+        public bool FirstColorsEnabled => firstGroup.interactable;
 
         public void Show(bool on)
         {
@@ -130,7 +165,7 @@ namespace PachiMoji
         }
 
         // 昇格の範囲：銀・金・虹のメダルを並べ、指でなぞった端から端までを範囲にする
-        void Range(RectTransform parent, float y)
+        void Range(RectTransform parent, ref float y)
         {
             var head = MainScreen.Rect(parent, "RangeHead");
             MainScreen.Place(head, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 22));
@@ -158,6 +193,7 @@ namespace PachiMoji
             {
                 (settings.From, settings.To) = RangePicker.FromDrag(a, b);
                 ShowRange((settings.From, settings.To));
+                ShowFirstEnabled();
                 onChanged(settings);
             };
             y -= 60;
@@ -170,6 +206,49 @@ namespace PachiMoji
             MainScreen.Place(help, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 24));
             MainScreen.Label(help, "メダルを指でなぞって、はじまりとおわりの色を選びます", UiTheme.Body, 12, UiTheme.Muted);
             ShowRange((settings.From, settings.To));
+            y -= 48;
+        }
+
+        // 最初の文字色と背景：銀の段（ドンで着地してから金に変わるまで）の色。はじまりが銀のときだけ選べる
+        void First(RectTransform parent, ref float y)
+        {
+            var box = MainScreen.Rect(parent, "First");
+            box.anchorMin = new Vector2(0, 1); box.anchorMax = new Vector2(1, 1);
+            box.pivot = new Vector2(0.5f, 1);
+            box.anchoredPosition = new Vector2(0, y);
+            firstGroup = box.gameObject.AddComponent<CanvasGroup>();
+            float by = 0;
+            Choice(box, ref by, "最初の文字色", new[] { "銀", "青", "緑", "赤", "紫" },
+                new[] { UiTheme.Chrome, Hex(FirstColors.TextBase(FirstText.Blue)), Hex(FirstColors.TextBase(FirstText.Green)),
+                        Hex(FirstColors.TextBase(FirstText.Red)), Hex(FirstColors.TextBase(FirstText.Purple)) },
+                (int)settings.FirstText, 62, i => settings.FirstText = (FirstText)i);
+            Choice(box, ref by, "最初の背景", new[] { "青", "緑", "赤", "紫" },
+                new[] { Hex(FirstColors.TextBase(FirstText.Blue)), Hex(FirstColors.TextBase(FirstText.Green)),
+                        Hex(FirstColors.TextBase(FirstText.Red)), Hex(FirstColors.TextBase(FirstText.Purple)) },
+                (int)settings.FirstBack, 80, i => settings.FirstBack = (FirstBack)i);
+            box.sizeDelta = new Vector2(0, -by);
+            y += by;
+
+            var note = MainScreen.Rect(parent, "FirstNote");
+            MainScreen.Place(note, new Vector2(0.5f, 1), new Vector2(0, y + 8), new Vector2(340, 24));
+            firstNote = MainScreen.Label(note, "", UiTheme.Body, 12, UiTheme.Muted);
+            y -= 24;
+            ShowFirstEnabled();
+        }
+
+        // はじまりが銀でないときは、最初の色を薄くして押せなくし、わけを出す
+        void ShowFirstEnabled()
+        {
+            bool on = settings.FirstColorsApply;
+            firstGroup.alpha = on ? 1 : 0.3f;
+            firstGroup.interactable = firstGroup.blocksRaycasts = on;
+            firstNote.text = on ? "ドンと着地してから、金に変わるまでの色です" : "昇格のはじまりが銀のときに効きます";
+        }
+
+        static Color Hex(string hex)
+        {
+            ColorUtility.TryParseHtmlString(hex, out var c);
+            return c;
         }
 
         // 金の帯を、はじまりのメダルからおわりのメダルまで伸ばし、メダルの明るさで範囲を見せる

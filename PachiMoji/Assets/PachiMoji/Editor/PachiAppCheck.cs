@@ -138,6 +138,11 @@ namespace PachiMoji.EditorTools
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_changed.png"), new EffectSettings
                     { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho, From = Tier.Gold, To = Tier.Rainbow });
+                // いちばん下まで動かした姿（最初の色）：はじまりが銀なら選べる、金なら薄くて押せない（iPhone SE の 9:16 でも）
+                ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_silver.png"), new EffectSettings { FirstText = FirstText.Red, FirstBack = FirstBack.Purple },
+                    sc => { Expect(sc.FirstColorsEnabled, "はじまりが銀なら最初の色を選べる"); Expect(sc.Scrollable, "設定画面を縦に動かせる"); });
+                ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_gold.png"), new EffectSettings { From = Tier.Gold },
+                    sc => Expect(!sc.FirstColorsEnabled, "はじまりが金なら最初の色は押せない"), bottom: true);
 
                 // 動画の書き出し（PNG の版で、アプリと同じ VideoExporter を動かす）
                 CheckExport(outDir);
@@ -277,7 +282,7 @@ namespace PachiMoji.EditorTools
             UnityEngine.Object.DestroyImmediate(board);
         }
 
-        static void ShotSettings(int w, int h, string path, EffectSettings settings)
+        static void ShotSettings(int w, int h, string path, EffectSettings settings, Action<SettingsScreen> check = null, bool bottom = false)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             float pt = w / UiTheme.ReferenceSize.x;
@@ -288,6 +293,9 @@ namespace PachiMoji.EditorTools
             var screen = SettingsScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h), settings, _ => { });
             screen.Show(true);
             screen.SetSlide(0);
+            Canvas.ForceUpdateCanvases();
+            if (check != null || bottom) screen.ScrollTo(0);   // いちばん下
+            check?.Invoke(screen);
             RenderUi(rt, path, uiCam);
         }
 
