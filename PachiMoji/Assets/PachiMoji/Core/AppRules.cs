@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace PachiMoji
 {
-    /// <summary>アプリの状態：入力を待つ・再生中・終わって止まっている・設定画面</summary>
-    public enum AppState { Idle, Playing, Finished, Settings }
+    /// <summary>アプリの状態：入力を待つ・再生中・終わって止まっている・設定画面・書き出し中・書き出しできた</summary>
+    public enum AppState { Idle, Playing, Finished, Settings, Exporting, Exported }
 
     /// <summary>再生の時計。裏に回して戻っても、続きから流れる（終わりに飛ばない）</summary>
     public static class PlayClock
@@ -13,10 +13,10 @@ namespace PachiMoji
         public static float Step(float t, float dt) => t + Mathf.Clamp(dt, 0f, MaxStep);
     }
 
-    /// <summary>画面の自動消灯：再生中だけ消さない</summary>
+    /// <summary>画面の自動消灯：再生中と書き出し中だけ消さない</summary>
     public static class SleepPolicy
     {
-        public static int For(AppState s) => s == AppState.Playing ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
+        public static int For(AppState s) => s == AppState.Playing || s == AppState.Exporting ? SleepTimeout.NeverSleep : SleepTimeout.SystemSetting;
     }
 
     /// <summary>

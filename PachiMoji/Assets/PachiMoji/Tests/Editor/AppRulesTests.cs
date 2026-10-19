@@ -17,6 +17,8 @@ namespace PachiMoji.Tests
             Assert.AreEqual(SleepTimeout.SystemSetting, SleepPolicy.For(AppState.Idle));
             Assert.AreEqual(SleepTimeout.SystemSetting, SleepPolicy.For(AppState.Finished));
             Assert.AreEqual(SleepTimeout.SystemSetting, SleepPolicy.For(AppState.Settings));
+            Assert.AreEqual(SleepTimeout.NeverSleep, SleepPolicy.For(AppState.Exporting));   // 書き出し中も消さない
+            Assert.AreEqual(SleepTimeout.SystemSetting, SleepPolicy.For(AppState.Exported));
         }
 
         // 舞台の絵を画面の一部（範囲）に縮めて置く投影。カメラの正面の点は範囲のまん中に、画角の端は範囲の端に映る
