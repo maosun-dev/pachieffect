@@ -19,6 +19,7 @@ namespace PachiMoji.EditorTools
     ///   MakeWatermark … 動画の右下に重ねる印「脳汁メーカー」を作る
     ///   ConfigureCli  … iPhone 用の設定を当てる（手元用）
     ///   BuildIos      … GitHub の組み立て機（GameCI）から呼ばれる。設定を当てて Xcode の作りを書き出す
+    ///                   -pachiProduction が付いていれば、ストアに出す版（本物の広告）にする
     /// </summary>
     public static class PachiBuild
     {
@@ -32,6 +33,9 @@ namespace PachiMoji.EditorTools
         public static readonly string[] Shaders =
             { "PachiMoji/Burst", "PachiMoji/Flash", "PachiMoji/Glint", "PachiMoji/Metal", "PachiMoji/Rays", "PachiMoji/Spark" };
         const string GraphicsSettingsPath = "ProjectSettings/GraphicsSettings.asset";
+        public const string AdsSettingsPath = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
+        public const string ProductionDefine = "PACHI_PRODUCTION";
+        public const string TrackingText = "あなたに合った広告を出すために使います。許可しなくても、アプリはすべて使えます";
 
         /// <summary>PachiApp だけが載ったシーンを作る（カメラ・ライト・画面の部品は置かない。どれも PachiApp がコードで作る）</summary>
         public static void MakePlayScene()
@@ -168,8 +172,8 @@ namespace PachiMoji.EditorTools
             });
         }
 
-        /// <summary>iPhone 用の設定を当てる。何度呼んでも同じ結果になる</summary>
-        public static void Configure()
+        /// <summary>iPhone 用の設定を当てる。何度呼んでも同じ結果になる。production はストアに出す版（本物の広告）</summary>
+        public static void Configure(bool production = false)
         {
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, BundleId);
             PlayerSettings.productName = AppName;
@@ -206,9 +210,41 @@ namespace PachiMoji.EditorTools
                 EditorUtility.SetDirty(mobile);
             }
 
+            ConfigureAds(production);
+
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(PlayScene, true) };
             AssetDatabase.SaveAssets();
             Debug.Log("[PachiBuild] iPhone 用の設定を当てた");
+        }
+
+        /// <summary>
+        /// 広告：ストアに出す版だけ PACHI_PRODUCTION を付ける（AdIds が本物の広告枠を使う）。
+        /// 広告の部品の設定（組み立てのときに Info.plist へ AdMob のアプリ ID と追跡の許可の文を書く）も合わせる
+        /// </summary>
+        static void ConfigureAds(bool production)
+        {
+            if (production && AdIds.RealIdsMissing)
+                throw new Exception("AdMob の本物の ID が TODO のまま（AdIds.cs に入れてから、ストアに出す版を組み立てる）");
+            var defines = new System.Collections.Generic.List<string>(
+                PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.iOS).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries));
+            defines.Remove(ProductionDefine);
+            if (production) defines.Add(ProductionDefine);
+            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.iOS, string.Join(";", defines));
+
+            // 設定のしくみは部品の内側（internal）なので、ファイルとして読み書きする。無ければ部品に作らせる
+            var settings = AssetDatabase.LoadAssetAtPath<ScriptableObject>(AdsSettingsPath);
+            if (settings == null)
+            {
+                var type = Type.GetType("GoogleMobileAds.Editor.GoogleMobileAdsSettings, GoogleMobileAds.Editor");
+                if (type == null) throw new Exception("広告の部品（Google Mobile Ads）が入っていない");
+                settings = (ScriptableObject)type.GetMethod("LoadInstance",
+                    System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public).Invoke(null, null);
+            }
+            var so = new SerializedObject(settings);
+            so.FindProperty("adMobIOSAppId").stringValue = production ? AdIds.RealAppId : AdIds.TestAppId;
+            so.FindProperty("userTrackingUsageDescription").stringValue = TrackingText;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(settings);
         }
 
         /// <summary>iPhone が使う画質（Mobile）の描画設定</summary>
@@ -231,15 +267,17 @@ namespace PachiMoji.EditorTools
             return false;
         }
 
-        public static void ConfigureCli() => RunCli(Configure);
+        public static void ConfigureCli() => RunCli(() => Configure());
 
         /// <summary>GameCI から呼ばれる入口。設定を当てて、Xcode の作りを -customBuildPath（無ければ build/iOS/iOS）に書き出す</summary>
         public static void BuildIos()
         {
             RunCli(() =>
             {
-                Configure();
                 var args = Environment.GetCommandLineArgs();
+                bool production = Array.IndexOf(args, "-pachiProduction") >= 0;
+                Configure(production);
+                Debug.Log("[PachiBuild] " + (production ? "ストアに出す版（本物の広告）" : "テスト広告の版"));
                 string path = "build/iOS/iOS";
                 int i = Array.IndexOf(args, "-customBuildPath");
                 if (i >= 0 && i + 1 < args.Length) path = args[i + 1];

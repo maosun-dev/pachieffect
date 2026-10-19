@@ -21,6 +21,10 @@ on:
         description: 'TestFlight まで送る（オフなら Unity で Xcode の作りを作るところまで）'
         type: boolean
         default: true
+      production:
+        description: 'ストアに出す版（本物の広告）。オフならテスト広告'
+        type: boolean
+        default: false
       runner:
         description: '仕上げに使う Mac（新しいチップの Mac は混んでいて始まらないことがある）'
         type: choice
@@ -32,7 +36,8 @@ permissions:
 
 jobs:
   unity:
-    runs-on: ubuntu-latest
+    # ubuntu-latest は 2026-10-19 から Ubuntu 26 へ移り始めた。今まで通った 24.04 に固定する
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +66,8 @@ jobs:
           targetPlatform: iOS
           buildMethod: PachiMoji.EditorTools.PachiBuild.BuildIos
           versioning: None
+          # ストアに出す版だけ本物の広告（PachiBuild が PACHI_PRODUCTION を付け、AdMob の本物のアプリ ID を入れる）
+          customParameters: ${{ inputs.production && '-pachiProduction' || '' }}
 
       # そのまま渡すと実行の許可（シェルの印）が消えて Xcode の手順が動かないので、固めて渡す
       - name: Xcode の作りを固める
@@ -119,10 +126,14 @@ jobs:
 
       # ここでは署名しない（署名すると開発用の証明書が要り、それには iPhone の登録が要る）。
       # 配布用の署名は次の「TestFlight に送る」で付ける。
+      # 広告の部品（Google Mobile Ads）は CocoaPods で取ってくる。Linux 機では入れられないので、ここで入れる
+      - name: 広告の部品を取ってくる（pod install）
+        run: cd iOS && pod install --repo-update
+
       - name: アプリを組み立てる（archive）
         run: |
           xcodebuild archive \
-            -project iOS/Unity-iPhone.xcodeproj \
+            -workspace iOS/Unity-iPhone.xcworkspace \
             -scheme Unity-iPhone \
             -configuration Release \
             -destination 'generic/platform=iOS' \

@@ -52,6 +52,28 @@ namespace PachiMoji.EditorTools
                 var workflow = Path.Combine(Application.dataPath, "../../.github/workflows/ios-testflight.yml");
                 Expect(File.Exists(workflow) && File.ReadAllText(workflow).Contains("NSPhotoLibraryAddUsageDescription string 書き出した動画を写真に保存するために使います"), "写真の許可の文");
                 Expect(PlayerSettings.allowUnsafeCode, "unsafe を許す（コマの中身の場所を mm に渡す）");
+
+                // 広告と課金の部品（版を固定）と、組み立ての道
+                string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../.."));
+                string manifest = File.ReadAllText(Path.Combine(root, "PachiMoji/Packages/manifest.json"));
+                Expect(manifest.Contains("\"com.unity.purchasing\": \"5.4.4\""), "課金の部品 5.4.4");
+                Expect(manifest.Contains("\"com.google.ads.mobile\": \"11.5.0\""), "広告の部品 11.5.0");
+                Expect(manifest.Contains("\"com.google.external-dependency-manager\": \"1.2.189\""), "External Dependency Manager 1.2.189");
+                Expect(manifest.Contains("https://package.openupm.com"), "OpenUPM の登録先");
+                string gvhPath = Path.Combine(root, "PachiMoji/ProjectSettings/GvhProjectSettings.xml");
+                string gvh = File.Exists(gvhPath) ? File.ReadAllText(gvhPath) : "";
+                Expect(gvh.Contains("name=\"Google.IOSResolver.UseProjectSettings\" value=\"True\""), "iOS の部品の設定はプロジェクトのもの");
+                Expect(gvh.Contains("name=\"Google.IOSResolver.CocoapodsInstallEnabled\" value=\"False\""), "Linux では pod install しない");
+                Expect(gvh.Contains("name=\"Google.IOSResolver.CocoapodsIntegrationMethod\" value=\"2\""), "xcworkspace でつなぐ");
+                string wf = File.ReadAllText(Path.Combine(root, ".github/workflows/ios-testflight.yml"));
+                Expect(wf.Contains("production:") && wf.Contains("-pachiProduction"), "ストアに出す版の印（production）");
+                Expect(wf.Contains("pod install") && wf.Contains("-workspace iOS/Unity-iPhone.xcworkspace"), "Mac の段で pod install して xcworkspace を組み立てる");
+                // AdMob のアプリ ID と追跡の許可の文は、広告の部品が組み立てのときに Info.plist へ書く（設定は PachiBuild.Configure が入れる）
+                string ads = File.Exists(Path.Combine(root, "PachiMoji", PachiBuild.AdsSettingsPath)) ? File.ReadAllText(Path.Combine(root, "PachiMoji", PachiBuild.AdsSettingsPath)) : "";
+                Expect(ads.Contains("adMobIOSAppId: " + AdIds.TestAppId), "広告の部品の設定はテスト用のアプリ ID");
+                Expect(ads.Contains("userTrackingUsageDescription: ") && !ads.Contains("userTrackingUsageDescription: \n"), "追跡の許可の文");
+                Expect(!PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.iOS).Contains(PachiBuild.ProductionDefine), "手元の設定に本番の印が付いていない");
+                Expect(!AdIds.Production && AdIds.Banner == AdIds.TestBanner && AdIds.Rewarded == AdIds.TestRewarded, "手元はテスト広告");
                 // iPhone は Mobile の画質で動く。0.8 倍で描いて引き伸ばすと金の縁がぼやけるので 1 倍
                 Expect(Mathf.Approximately(PachiBuild.MobilePipeline().renderScale, 1f), "Mobile の描く細かさが 1 倍");
 
