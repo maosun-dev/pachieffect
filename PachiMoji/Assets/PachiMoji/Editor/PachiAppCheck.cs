@@ -101,6 +101,12 @@ namespace PachiMoji.EditorTools
                     ShotMain(w, h, Path.Combine(outDir, $"main_{tag}_end.png"), "定時", "退社", AppState.Finished);
                 }
 
+                // 書き出しの画面：書き出し中・できた（保存済み）・失敗の知らせ（9:19.5）
+                ShotExport(720, 1560, Path.Combine(outDir, "main_9x19_exporting.png"), AppState.Exporting, ui => ui.SetExportProgress(73));
+                ShotExport(720, 1560, Path.Combine(outDir, "main_9x19_exported.png"), AppState.Exported, ui => ui.SetSaved(true));
+                ShotMain(720, 1560, Path.Combine(outDir, "main_9x19_export_error.png"), "定時", "退社", AppState.Finished,
+                    ui => ui.EndNotice.text = ExportRules.Message(ExportError.NoSpace));
+
                 // 設定画面：既定と、全部を変えたとき
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_changed.png"), new EffectSettings
@@ -178,7 +184,7 @@ namespace PachiMoji.EditorTools
         /// メイン画面を1枚に撮る（PachiApp と同じ部品・同じ確かめ方で）。
         /// 縦長（9:19.5）のときは、ノッチ（上 47pt）とホームバー（下 34pt）を避けた範囲に置く
         /// </summary>
-        static void ShotMain(int w, int h, string path, string l1, string l2, AppState state)
+        static void ShotMain(int w, int h, string path, string l1, string l2, AppState state, Action<MainScreen> extra = null)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             float pt = w / UiTheme.ReferenceSize.x;
@@ -206,8 +212,42 @@ namespace PachiMoji.EditorTools
                 stage.Frame();
                 stage.Effect.Camera.Render();   // アプリでは毎コマ自動で描かれる
             }
+            Expect(ui.Export.interactable, "「書き出す」を押せる");
+            extra?.Invoke(ui);
             RenderUi(rt, path, uiCam);
             stage.Dispose();
+        }
+
+        /// <summary>
+        /// 書き出しの画面を1枚に撮る。アプリと同じく画面の舞台は片付けてあり、書き出しの板（9:16）だけを見せる。
+        /// 板の代わりに、書き出し中は 6 秒目・できたは最後の姿を描く
+        /// </summary>
+        static void ShotExport(int w, int h, string path, AppState state, Action<MainScreen> extra)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            float pt = w / UiTheme.ReferenceSize.x;
+            var safe = new Rect(0, 34 * pt, w, h - (47 + 34) * pt);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = MainScreen.CreateUiCamera();
+            uiCam.targetTexture = rt;
+            var ui = MainScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h));
+            ui.SetDeckSink(1);
+            ui.ShowState(state);
+
+            var e = EffectCatalog.Get("oudou").Create();
+            e.Build(Words, (float)ExportPlan.Width / ExportPlan.Height, new EffectSettings());
+            e.Evaluate(state == AppState.Exporting ? 6f : e.Duration);
+            var board = new RenderTexture(ExportPlan.Width / 2, ExportPlan.Height / 2, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            e.Camera.targetTexture = board;
+            e.Camera.cullingMask &= ~(1 << MainScreen.UiLayer);
+            e.Camera.Render();
+            e.Camera.enabled = false;
+            ui.ExportView.texture = board;
+            extra(ui);
+            RenderUi(rt, path, uiCam);
+            e.Dispose();
+            board.Release();
+            UnityEngine.Object.DestroyImmediate(board);
         }
 
         static void ShotSettings(int w, int h, string path, EffectSettings settings)

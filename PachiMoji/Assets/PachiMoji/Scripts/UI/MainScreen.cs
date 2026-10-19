@@ -17,9 +17,14 @@ namespace PachiMoji
         public TMP_InputField Line1, Line2;
         public Button Push, Again, Export, ChangeWords, Gear;
         public TMP_Text Notice;
+        public RawImage ExportView;                          // 書き出している板（9:16）を範囲に収めて見せる
+        public Button CancelExport, SavePhoto, Share, CloseExport;
+        public TMP_Text EndNotice;                           // 終わり・できたの画面の知らせ（失敗の直し方・保存しました）
         public RectTransform StageIdleArea, StagePlayArea;   // 舞台の絵を置く範囲（待ち・再生）
         public RawImage StageView;                           // 舞台の絵を貼る板（StageScreen が使う）
         RectTransform deck; CanvasGroup deckGroup, endGroup, gearGroup, changeGroup;
+        CanvasGroup runGroup, doneGroup, closeGroup, endNoticeGroup;
+        TMP_Text percentLabel, saveLabel; RectTransform progressFill; float progressWidth;
         Image dome; TMP_Text pushLabel;
         float deckHeight; bool pushOn = true;
 
@@ -133,11 +138,9 @@ namespace PachiMoji
             scrimImg.raycastTarget = false;
             var bottom = new Vector2(0.5f, 0);
             m.Again = PlateButton(end, "もう一回", bottom, new Vector2(-88, 72), new Vector2(164, 60), UiTheme.Display, 22, UiTheme.Chrome);
-            m.Export = PlateButton(end, "書き出す", bottom, new Vector2(88, 72), new Vector2(164, 60), UiTheme.Display, 22, UiTheme.Muted);
-            m.Export.interactable = false;   // 書き出しは順番3で作る
-            var later = Rect(end, "Later");
-            Place(later, new Vector2(0.5f, 0), new Vector2(0, 22), new Vector2(350, 24));
-            Label(later, "書き出しは次の版でできます", UiTheme.Body, 12, UiTheme.Muted);
+            m.Export = PlateButton(end, "書き出す", bottom, new Vector2(88, 72), new Vector2(164, 60), UiTheme.Display, 22, UiTheme.Chrome);
+
+            BuildExport(m, safe, end);
 
             SetLayer(root.gameObject, UiLayer);
             m.ShowState(AppState.Idle);
@@ -149,9 +152,107 @@ namespace PachiMoji
         {
             bool idle = s == AppState.Idle || s == AppState.Settings;
             Show(gearGroup, idle);
+            bool exporting = s == AppState.Exporting, exported = s == AppState.Exported;
             Show(endGroup, s == AppState.Finished);
             Show(changeGroup, s == AppState.Finished);
+            Show(runGroup, exporting);
+            Show(doneGroup, exported);
+            Show(closeGroup, exported);
+            Show(endNoticeGroup, s == AppState.Finished || exported);
+            ExportView.enabled = exporting || exported;
+            // 書き出し中は板を暗く透かして、進み具合の数字を主役にする
+            ExportView.color = exporting ? new Color(0.35f, 0.35f, 0.35f, 1) : Color.white;
             deckGroup.interactable = deckGroup.blocksRaycasts = idle;
+        }
+
+        /// <summary>
+        /// 書き出しの画面。主役は進み具合の数字ひとつ（演出と同じ Reggae One の金）。ほかは黒と銀で静かに。
+        /// できたの画面は、終わりの画面と同じ場所・同じ大きさの銀の板（写真に保存・共有）と、左上の「閉じる」
+        /// </summary>
+        static void BuildExport(MainScreen m, RectTransform safe, RectTransform end)
+        {
+            // 書き出している板：再生の範囲の中に 9:16 のまま収める
+            var view = Rect(m.StagePlayArea, "ExportView");
+            view.anchorMin = Vector2.zero; view.anchorMax = Vector2.one;
+            view.offsetMin = view.offsetMax = Vector2.zero;
+            m.ExportView = view.gameObject.AddComponent<RawImage>();
+            m.ExportView.raycastTarget = false;
+            m.ExportView.enabled = false;
+            var fit = view.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            fit.aspectRatio = (float)ExportPlan.Width / ExportPlan.Height;
+
+            // 書き出し中：数字・溝と金の帯・説明・やめる
+            var run = Rect(m.StagePlayArea, "ExportRun");
+            run.anchorMin = Vector2.zero; run.anchorMax = Vector2.one;
+            run.offsetMin = run.offsetMax = Vector2.zero;
+            m.runGroup = run.gameObject.AddComponent<CanvasGroup>();
+            var num = Rect(run, "Percent");
+            Place(num, new Vector2(0.5f, 0.5f), new Vector2(0, 50), new Vector2(320, 150));
+            m.percentLabel = Label(num, "", UiTheme.Display, 120, UiTheme.Gold);
+            m.percentLabel.richText = true;
+            var groove = Rect(run, "Groove");
+            Place(groove, new Vector2(0.5f, 0.5f), new Vector2(0, -42), new Vector2(260, 22));
+            var grooveImg = groove.gameObject.AddComponent<Image>();
+            grooveImg.sprite = UiArt.Groove();
+            grooveImg.type = Image.Type.Sliced;
+            m.progressFill = Rect(groove, "Fill");
+            m.progressFill.anchorMin = m.progressFill.anchorMax = new Vector2(0, 0.5f);
+            m.progressFill.pivot = new Vector2(0, 0.5f);
+            m.progressFill.anchoredPosition = new Vector2(3, 0);
+            m.progressWidth = 260 - 6;
+            var fillImg = m.progressFill.gameObject.AddComponent<Image>();
+            fillImg.sprite = UiArt.Rail();
+            fillImg.type = Image.Type.Sliced;
+            var note = Rect(run, "Note");
+            Place(note, new Vector2(0.5f, 0.5f), new Vector2(0, -76), new Vector2(300, 24));
+            Label(note, "書き出し中です", UiTheme.Body, 13, UiTheme.Muted);
+            m.CancelExport = PlateButton(run, "やめる", new Vector2(0.5f, 0.5f), new Vector2(0, -132), new Vector2(136, 48), UiTheme.Body, 16, UiTheme.Chrome);
+
+            // できた：写真に保存・共有（終わりの画面の2つと同じ場所）
+            var done = Rect(safe, "ExportDone");
+            done.anchorMin = end.anchorMin; done.anchorMax = end.anchorMax; done.pivot = end.pivot;
+            done.anchoredPosition = end.anchoredPosition; done.sizeDelta = end.sizeDelta;
+            m.doneGroup = done.gameObject.AddComponent<CanvasGroup>();
+            var scrim = Rect(done, "Scrim");
+            scrim.anchorMin = Vector2.zero; scrim.anchorMax = Vector2.one;
+            scrim.offsetMin = Vector2.zero; scrim.offsetMax = new Vector2(0, 90);
+            var scrimImg = scrim.gameObject.AddComponent<Image>();
+            scrimImg.sprite = UiArt.Scrim();
+            scrimImg.raycastTarget = false;
+            var bottom = new Vector2(0.5f, 0);
+            m.SavePhoto = PlateButton(done, "写真に保存", bottom, new Vector2(-88, 72), new Vector2(164, 60), UiTheme.Display, 20, UiTheme.Chrome);
+            m.saveLabel = m.SavePhoto.GetComponentInChildren<TMP_Text>();
+            m.Share = PlateButton(done, "共有", bottom, new Vector2(88, 72), new Vector2(164, 60), UiTheme.Display, 22, UiTheme.Chrome);
+            m.CloseExport = PlateButton(safe, "閉じる", new Vector2(0, 1), new Vector2(76, -32), new Vector2(136, 44), UiTheme.Body, 15, UiTheme.Chrome);
+            m.closeGroup = m.CloseExport.gameObject.AddComponent<CanvasGroup>();
+
+            // 知らせ：終わり（失敗の直し方）とできた（保存しました）の、ボタンの下に2行まで
+            var notice = Rect(safe, "EndNotice");
+            Place(notice, new Vector2(0.5f, 0), new Vector2(0, UiTheme.BannerHeight + 22), new Vector2(350, 36));
+            m.endNoticeGroup = notice.gameObject.AddComponent<CanvasGroup>();
+            m.EndNotice = Label(notice, "", UiTheme.Body, 12, UiTheme.Chrome);
+            m.EndNotice.textWrappingMode = TextWrappingModes.Normal;
+            m.EndNotice.enableAutoSizing = true; m.EndNotice.fontSizeMin = 9; m.EndNotice.fontSizeMax = 12;
+            m.SetExportProgress(0);
+        }
+
+        /// <summary>書き出しの進み具合（0〜100）</summary>
+        public void SetExportProgress(int percent)
+        {
+            percent = Mathf.Clamp(percent, 0, 100);
+            percentLabel.text = percent + "<size=33%>%</size>";
+            // 帯は端の丸みのぶん（高さ 16）から伸びる。0% は帯を隠す
+            progressFill.sizeDelta = new Vector2(Mathf.Lerp(16, progressWidth, percent / 100f), 16);
+            progressFill.gameObject.SetActive(percent > 0);
+        }
+
+        /// <summary>写真に保存できたら、ボタンを押せなくして知らせる</summary>
+        public void SetSaved(bool saved)
+        {
+            SavePhoto.interactable = !saved;
+            saveLabel.color = saved ? UiTheme.Muted : UiTheme.Chrome;
+            EndNotice.text = saved ? "写真に保存しました" : "";
         }
 
         /// <summary>台の沈み具合（0＝いつもの位置、1＝下へ沈んで見えない）</summary>

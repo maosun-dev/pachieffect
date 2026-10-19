@@ -148,6 +148,24 @@ namespace PachiMoji
             return ToSprite(px, W, H, new Vector4(16, 0, 16, 0));
         });
 
+        /// <summary>進み具合の溝：細い銀の縁に囲まれた黒いくぼみ（中に金の帯 Rail を置く）。9スライス</summary>
+        public static Sprite Groove() => Cached("groove", () =>
+        {
+            const int W = 64, H = 32;
+            const float Bezel = 3;
+            var px = new Color[W * H];
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    float d = RoundRectDist(x + 0.5f, y + 0.5f, W, H, H * 0.5f);
+                    float ny = (y + 0.5f) / H * 2 - 1;
+                    Color c = d < Bezel ? ChromeAt(d / Bezel, ny, 0.8f) : UiTheme.Hex(0x000000);
+                    c.a = Mathf.Clamp01(d + 0.5f);
+                    px[y * W + x] = c;
+                }
+            return ToSprite(px, W, H, new Vector4(16, 0, 16, 0));
+        });
+
         /// <summary>光の色の見本：芯が白く、まわりに色がにじむ小さな光の点</summary>
         public static Sprite Dot(Color c) => Cached("dot" + ColorUtility.ToHtmlStringRGB(c), () => GlowDot(_ => c));
 

@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -5,7 +6,8 @@ using UnityEngine.InputSystem.UI;
 namespace PachiMoji
 {
     /// <summary>
-    /// アプリの流れ：言葉を入れて待つ → PUSH で演出 → 終わったら「もう一回」「言葉を変える」。
+    /// アプリの流れ：言葉を入れて待つ → PUSH で演出 → 終わったら「もう一回」「書き出す」「言葉を変える」。
+    /// 書き出すと、画面の舞台を片付けて書き出し用の演出を別に組み立て、終わったら「写真に保存」「共有」。
     /// 舞台を組み立て直すのは、入力を確定したときと設定を閉じたときだけ（言葉と設定が前と同じなら作り直さない）。
     /// </summary>
     public class PachiApp : MonoBehaviour
@@ -16,6 +18,7 @@ namespace PachiMoji
 
         EffectSettings settings;
         StageScreen stage;
+        VideoExporter exporter;
         string builtKey;
         InputCheck check;
         MainScreen ui;
@@ -51,6 +54,11 @@ namespace PachiMoji
             ui.Again.onClick.AddListener(StartPlay);
             ui.ChangeWords.onClick.AddListener(BackToIdle);
             ui.Gear.onClick.AddListener(OpenSettings);
+            ui.Export.onClick.AddListener(StartExport);
+            ui.CancelExport.onClick.AddListener(CancelExport);
+            ui.SavePhoto.onClick.AddListener(SavePhoto);
+            ui.Share.onClick.AddListener(() => VideoShare.Share(exporter?.OutputPath));
+            ui.CloseExport.onClick.AddListener(BackToFinished);
 
             Canvas.ForceUpdateCanvases();
             Rebuild();
@@ -75,6 +83,7 @@ namespace PachiMoji
                 else if (slideDir < 0 && slide <= 0) slideDir = 0;
             }
             ui.Pulse(Time.unscaledTime);
+            if (state == AppState.Exporting) StepExport();
 
             if (!stage.Visible) return;
             var fx = stage.Effect;
@@ -94,7 +103,97 @@ namespace PachiMoji
             stage.Frame();
         }
 
-        void OnDestroy() => stage?.Dispose();
+        void OnDestroy()
+        {
+            exporter?.Dispose();
+            stage?.Dispose();
+        }
+
+        // 書き出し中に裏へ回ると、iPhone の動画づくりは止まって壊れたファイルが残る。やめて、知らせる
+        void OnApplicationPause(bool paused)
+        {
+            if (!paused || state != AppState.Exporting) return;
+            exporter.Cancel();
+            ExportFailed(ExportError.Interrupted);
+        }
+
+        // ───────── 書き出し ─────────
+
+        void StartExport()
+        {
+            if (state != AppState.Finished || exporter != null) return;
+            ui.EndNotice.text = "";
+            // 画面の舞台と書き出しの舞台が同じ場所に重ならないよう、画面のほうは片付ける（戻るときに組み立て直す）
+            stage.Dispose();
+            builtKey = null;
+            bool ios = Application.platform == RuntimePlatform.IPhonePlayer;
+            string path = Path.Combine(Application.temporaryCachePath, ios ? "noujiru.mp4" : "noujiru_frames");
+            IVideoWriter writer = ios ? new IosVideoWriter() : new PngVideoWriter();
+            exporter = new VideoExporter(check.Lines, settings, watermark: true /* 順番4で Entitlements につなぐ */, writer, path);
+            var e = exporter.Start();
+            if (e != ExportError.None)
+            {
+                ExportFailed(e);
+                return;
+            }
+            ui.ExportView.texture = exporter.Preview;
+            ui.SetExportProgress(0);
+            SetState(AppState.Exporting);
+        }
+
+        void StepExport()
+        {
+            exporter.Step();
+            ui.SetExportProgress(exporter.Percent);
+            if (exporter.Status == ExportStatus.Done)
+            {
+                ui.SetSaved(false);
+                SetState(AppState.Exported);
+            }
+            else if (exporter.Status == ExportStatus.Failed) ExportFailed(exporter.Error);
+        }
+
+        void CancelExport()
+        {
+            if (state != AppState.Exporting) return;
+            exporter.Cancel();
+            BackToFinished();
+        }
+
+        void ExportFailed(ExportError e)
+        {
+            BackToFinished();
+            ui.EndNotice.text = ExportRules.Message(e);
+        }
+
+        // 終わりの画面に戻る：書き出しを片付け、画面の舞台を組み立て直して最後の姿にする（mp4 は共有のため次の書き出しまで残す）
+        void BackToFinished()
+        {
+            exporter?.Dispose();
+            exporter = null;
+            ui.ExportView.texture = null;
+            ui.EndNotice.text = "";
+            SetState(AppState.Finished);
+            Rebuild();
+            if (stage.Effect != null) stage.Effect.Evaluate(stage.Effect.Duration);
+            stage.Frame();
+        }
+
+        void SavePhoto()
+        {
+            if (state != AppState.Exported) return;
+            ui.SavePhoto.interactable = false;   // 返事が来るまで2回押せないように
+            VideoShare.SaveToPhotos(exporter.OutputPath, e =>
+            {
+                if (state != AppState.Exported) return;
+                if (e == ExportError.None) ui.SetSaved(true);
+                else
+                {
+                    ui.SavePhoto.interactable = true;
+                    ui.EndNotice.text = ExportRules.Message(e);
+                }
+            });
+        }
 
         /// <summary>打つたびに確かめる：知らせを出し、PUSH を押せるかを決める（舞台は作り直さない）</summary>
         void Validate()
