@@ -42,6 +42,16 @@ namespace PachiMoji.EditorTools
                 // CreatePrimitive(Quad) が付ける MeshCollider を、iPhone 版の「使わない部品を削る」から守る
                 var linkXml = Path.Combine(Application.dataPath, "link.xml");
                 Expect(File.Exists(linkXml) && File.ReadAllText(linkXml).Contains("UnityEngine.MeshCollider"), "link.xml で MeshCollider を残す");
+                // 書き出しの iPhone の部品：iPhone だけに入り、動画・写真の仕組みにつながる。写真の許可の文は組み立ての Mac の段で足す
+                var mm = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiVideo.mm") as PluginImporter;
+                Expect(mm != null && mm.GetCompatibleWithPlatform(BuildTarget.iOS) && !mm.GetCompatibleWithEditor()
+                       && !mm.GetCompatibleWithPlatform(BuildTarget.StandaloneWindows64), "PachiVideo.mm は iPhone だけ");
+                string deps = mm != null ? mm.GetPlatformData(BuildTarget.iOS, "FrameworkDependencies") : "";
+                foreach (var fw in new[] { "AVFoundation", "CoreMedia", "CoreVideo", "Photos" })
+                    Expect(deps.Contains(fw + ";"), "PachiVideo.mm が使う仕組み " + fw);
+                var workflow = Path.Combine(Application.dataPath, "../../.github/workflows/ios-testflight.yml");
+                Expect(File.Exists(workflow) && File.ReadAllText(workflow).Contains("NSPhotoLibraryAddUsageDescription string 書き出した動画を写真に保存するために使います"), "写真の許可の文");
+                Expect(PlayerSettings.allowUnsafeCode, "unsafe を許す（コマの中身の場所を mm に渡す）");
                 // iPhone は Mobile の画質で動く。0.8 倍で描いて引き伸ばすと金の縁がぼやけるので 1 倍
                 Expect(Mathf.Approximately(PachiBuild.MobilePipeline().renderScale, 1f), "Mobile の描く細かさが 1 倍");
 

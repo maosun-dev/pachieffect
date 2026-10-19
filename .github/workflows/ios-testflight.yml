@@ -103,6 +103,7 @@ jobs:
 
       # 組み立て番号：やり直し（Re-run）でも重ならないよう「実行番号×100＋やり直し回数」にする
       # 暗号の申告：特別な暗号は使っていないと書いておき、毎回聞かれないようにする
+      # 写真の許可の文：書き出した動画を写真に保存するときに iPhone が出す
       - name: 番号と申告を書き込む
         run: |
           BUILD=$(( ${{ github.run_number }} * 100 + ${{ github.run_attempt }} ))
@@ -111,6 +112,9 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"
           /usr/libexec/PlistBuddy -c "Delete :ITSAppUsesNonExemptEncryption" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST"
+          # 書き出した動画を写真に保存するときの許可の文（初回に iPhone が出す）
+          /usr/libexec/PlistBuddy -c "Delete :NSPhotoLibraryAddUsageDescription" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 書き出した動画を写真に保存するために使います" "$PLIST"
           echo "組み立て番号 $BUILD"
 
       # ここでは署名しない（署名すると開発用の証明書が要り、それには iPhone の登録が要る）。

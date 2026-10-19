@@ -180,6 +180,7 @@ namespace PachiMoji.EditorTools
             PlayerSettings.iOS.targetDevice = iOSTargetDevice.iPhoneOnly;
             PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
             PlayerSettings.iOS.appleEnableAutomaticSigning = false;   // 署名は GitHub の Mac の段で付ける
+            PlayerSettings.allowUnsafeCode = true;   // 書き出しのコマの中身の場所を PachiVideo.mm に渡す（IosVideoWriter）
 
             var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
             if (icon == null) throw new Exception("アイコンが無い（先に MakeIcon）: " + IconPath);
