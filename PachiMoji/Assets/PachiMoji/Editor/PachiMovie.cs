@@ -15,7 +15,7 @@ namespace PachiMoji.EditorTools
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiMovie.Run で動かす。
     /// 確認を速くするため、環境変数で書き出す範囲と画質を絞れる（movie.sh の引数から渡す）：
     ///   PACHI_FROM / PACHI_TO＝書き出す秒の範囲、PACHI_QUICK=1＝2倍で描いて縮めるのをやめる（細部は粗くなる）
-    ///   PACHI_RANGE＝昇格の範囲（SS/SG/SR/GG/GR/RR。S=銀・G=金・R=虹。無ければ既定の SR）
+    ///   PACHI_CHAIN＝昇格の色（S=銀 B=青 G=緑 P=紫 R=赤 K=金 N=虹 を格の順に並べる。例 GRN。無ければ既定の SKN）
     /// </summary>
     public static class PachiMovie
     {
@@ -31,15 +31,15 @@ namespace PachiMoji.EditorTools
                 float from = EnvFloat("PACHI_FROM", 0), to = EnvFloat("PACHI_TO", -1);
                 bool quick = Environment.GetEnvironmentVariable("PACHI_QUICK") == "1";
                 bool part = from > 0 || to >= 0;
-                string range = (Environment.GetEnvironmentVariable("PACHI_RANGE") ?? "").Trim().ToUpperInvariant();
+                string range = (Environment.GetEnvironmentVariable("PACHI_CHAIN") ?? "").Trim().ToUpperInvariant();
                 var settings = new EffectSettings();
                 string sheet = part ? "movie_part_sheet.png" : "movie_teiji_sheet.png";
                 if (range.Length > 0)
                 {
-                    if (range.Length != 2) throw new Exception("PACHI_RANGE は2文字（例 GR）: " + range);
-                    settings.From = TierOf(range[0]);
-                    settings.To = TierOf(range[1]);
-                    sheet = $"movie_range_{range}_sheet.png";
+                    var tiers = new System.Collections.Generic.List<Tier>();
+                    foreach (char c in range) tiers.Add(TierOf(c));
+                    settings.Chain = Chain.FromMask(Chain.ToMask(tiers));   // 格の順にそろえる
+                    sheet = $"movie_chain_{range}_sheet.png";
                 }
                 Render(new[] { "定時", "退社" }, 720, 1280, Path.Combine(outDir, "frames"),
                     Path.Combine(outDir, sheet), from, to, quick, settings);
@@ -55,9 +55,13 @@ namespace PachiMoji.EditorTools
         static Tier TierOf(char c) => c switch
         {
             'S' => Tier.Silver,
-            'G' => Tier.Gold,
-            'R' => Tier.Rainbow,
-            _ => throw new Exception("昇格の色は S/G/R のどれか: " + c),
+            'B' => Tier.Blue,
+            'G' => Tier.Green,
+            'P' => Tier.Purple,
+            'R' => Tier.Red,
+            'K' => Tier.Gold,
+            'N' => Tier.Rainbow,
+            _ => throw new Exception("昇格の色は S/B/G/P/R/K/N のどれか: " + c),
         };
 
         static float EnvFloat(string name, float def) =>
@@ -116,7 +120,7 @@ namespace PachiMoji.EditorTools
             File.WriteAllBytes(sheetPath, sheet.EncodeToPNG());
             st.cam.targetTexture = null;
             big.Release(); small.Release();
-            Debug.Log($"[PachiMovie] saved frames={total} from={first / (float)Fps:F2} seconds={st.End:F2} quick={quick} range={settings.From}-{settings.To}");
+            Debug.Log($"[PachiMovie] saved frames={total} from={first / (float)Fps:F2} seconds={st.End:F2} quick={quick} chain={Chain.Label(settings.Chain)}");
         }
 
         // 縮小（近い画素を拾うだけの簡単なもの）
