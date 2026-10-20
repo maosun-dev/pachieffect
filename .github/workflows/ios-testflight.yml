@@ -47,6 +47,9 @@ jobs:
         with:
           tool-cache: false
           large-packages: false
+          # スワップ（メモリの逃げ場）は残す。消すと、Unity がプログラムを読み込む一瞬のメモリの山で
+          # OS に強制終了される（exit 137）ことが続いた（2026-10-19・10-20）
+          swap-storage: false
 
       # Unity の読み込み済みの中身（Library）を取っておき、2回目から速くする
       - uses: actions/cache@v4
