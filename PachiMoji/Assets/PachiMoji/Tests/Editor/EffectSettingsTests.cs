@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -105,6 +105,83 @@ namespace PachiMoji.Tests
             Assert.AreEqual("#19D14A", FirstColors.TextBase(FirstText.Green));
             Assert.AreEqual("#FF2030", FirstColors.TextBase(FirstText.Red));
             Assert.AreEqual("#A040FF", FirstColors.TextBase(FirstText.Purple));
+        }
+
+        // ───────── 昇格の色・チラ見せ ─────────
+
+        [Test]
+        public void 昇格の色とチラ見せの既定()
+        {
+            var s = EffectSettings.Load(P);
+            CollectionAssert.AreEqual(new[] { Tier.Silver, Tier.Gold, Tier.Rainbow }, s.Chain);
+            Assert.AreEqual(12, s.TeaseCount);
+            Assert.AreEqual(Tier.Silver, s.TeaseText);
+            Assert.AreEqual(Tier.Blue, s.TeaseBack);
+        }
+
+        [Test]
+        public void 昇格の色とチラ見せを保存して読み戻す()
+        {
+            new EffectSettings { Chain = new[] { Tier.Green, Tier.Red, Tier.Rainbow }, TeaseCount = 3, TeaseText = Tier.Gold, TeaseBack = Tier.Purple }.Save(P);
+            var s = EffectSettings.Load(P);
+            CollectionAssert.AreEqual(new[] { Tier.Green, Tier.Red, Tier.Rainbow }, s.Chain);
+            Assert.AreEqual(3, s.TeaseCount);
+            Assert.AreEqual(Tier.Gold, s.TeaseText);
+            Assert.AreEqual(Tier.Purple, s.TeaseBack);
+        }
+
+        // 前の版の「はじまり・おわり」（0=銀・1=金・2=虹）だけを保存している人
+        static Tier[] OldRange(int from, int to)
+        {
+            PlayerPrefs.DeleteKey(P + "chain");
+            PlayerPrefs.SetInt(P + "from", from);
+            PlayerPrefs.SetInt(P + "to", to);
+            return EffectSettings.Load(P).Chain;
+        }
+
+        [Test]
+        public void 古いはじまりとおわりを読み替える()
+        {
+            CollectionAssert.AreEqual(new[] { Tier.Gold }, OldRange(1, 1));
+            CollectionAssert.AreEqual(new[] { Tier.Silver, Tier.Gold, Tier.Rainbow }, OldRange(0, 2));
+            CollectionAssert.AreEqual(new[] { Tier.Gold, Tier.Rainbow }, OldRange(1, 2));
+            CollectionAssert.AreEqual(new[] { Tier.Silver }, OldRange(0, 0));
+        }
+
+        [Test]
+        public void chainがあれば古い値は見ない()
+        {
+            PlayerPrefs.SetInt(P + "chain", 4);
+            PlayerPrefs.SetInt(P + "from", 0);
+            PlayerPrefs.SetInt(P + "to", 2);
+            CollectionAssert.AreEqual(new[] { Tier.Green }, EffectSettings.Load(P).Chain);
+        }
+
+        [Test]
+        public void 壊れた値は既定()
+        {
+            PlayerPrefs.SetInt(P + "chain", 0);
+            Assert.AreEqual(Chain.ToMask(Chain.Default), Chain.ToMask(EffectSettings.Load(P).Chain));
+            PlayerPrefs.SetInt(P + "chain", 999);
+            Assert.AreEqual(Chain.ToMask(Chain.Default), Chain.ToMask(EffectSettings.Load(P).Chain));
+            PlayerPrefs.SetInt(P + "teaseCount", -1);
+            Assert.AreEqual(12, EffectSettings.Load(P).TeaseCount);
+            PlayerPrefs.SetInt(P + "teaseCount", 13);
+            Assert.AreEqual(12, EffectSettings.Load(P).TeaseCount);
+            PlayerPrefs.SetInt(P + "teaseText", 7);
+            PlayerPrefs.SetInt(P + "teaseBack", -1);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(Tier.Silver, s.TeaseText);
+            Assert.AreEqual(Tier.Blue, s.TeaseBack);
+        }
+
+        [Test]
+        public void 写しの昇格の色は別物()
+        {
+            var a = new EffectSettings();
+            var b = a.Clone();
+            b.Chain[0] = Tier.Red;
+            Assert.AreEqual(Tier.Silver, a.Chain[0]);
         }
 
         [Test]
