@@ -253,6 +253,9 @@ namespace PachiMoji.EditorTools
                     sc.ShowShop(new Entitlements(new[] { ProductIds.Set }), ShopState.Ready, price);
                     Expect(sc.ItemCount == 0, "両方買ったら商品は無し");
                 });
+                // 審査用の写真（App Store のスクショの大きさ 1290×2796 でないと受け付けない）
+                ShotShop(1290, 2796, Path.Combine(outDir, "shop_review_1290x2796.png"), sc =>
+                    sc.ShowShop(new Entitlements(new string[0]), ShopState.Ready, price));
                 ShotShop(720, 1280, Path.Combine(outDir, "shop_unavailable.png"), sc =>
                     sc.ShowShop(new Entitlements(new string[0]), ShopState.Unavailable, _ => null));
                 // メイン画面の右上：歯車と買い物の投入口（拡大）
