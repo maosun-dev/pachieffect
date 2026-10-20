@@ -63,8 +63,8 @@ namespace PachiMoji
                 Light = (LightColor)Pick(prefix + "light", (int)d.Light, 3),
                 Size = (LightSize)Pick(prefix + "size", (int)d.Size, 2),
                 Font = (TextFont)Pick(prefix + "font", (int)d.Font, 1),
-                From = (Tier)Pick(prefix + "from", (int)d.From, 2),
-                To = (Tier)Pick(prefix + "to", (int)d.To, 2),
+                From = RangePicker.Medals[Pick(prefix + "from", 0, 2)],   // 保存は 0=銀・1=金・2=虹
+                To = RangePicker.Medals[Pick(prefix + "to", 2, 2)],
                 FirstText = (FirstText)Pick(prefix + "firstText", (int)d.FirstText, 4),
                 FirstBack = (FirstBack)Pick(prefix + "firstBack", (int)d.FirstBack, 3),
             };
@@ -78,8 +78,8 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "light", (int)Light);
             PlayerPrefs.SetInt(prefix + "size", (int)Size);
             PlayerPrefs.SetInt(prefix + "font", (int)Font);
-            PlayerPrefs.SetInt(prefix + "from", (int)From);
-            PlayerPrefs.SetInt(prefix + "to", (int)To);
+            PlayerPrefs.SetInt(prefix + "from", System.Array.IndexOf(RangePicker.Medals, From));
+            PlayerPrefs.SetInt(prefix + "to", System.Array.IndexOf(RangePicker.Medals, To));
             PlayerPrefs.SetInt(prefix + "firstText", (int)FirstText);
             PlayerPrefs.SetInt(prefix + "firstBack", (int)FirstBack);
             PlayerPrefs.Save();

@@ -1,7 +1,7 @@
 namespace PachiMoji
 {
-    /// <summary>昇格の色の段（銀 → 金 → 虹）</summary>
-    public enum Tier { Silver = 0, Gold = 1, Rainbow = 2 }
+    /// <summary>色の格（パチンコの期待度の順）：銀 → 青 → 緑 → 紫 → 赤 → 金 → 虹</summary>
+    public enum Tier { Silver = 0, Blue = 1, Green = 2, Purple = 3, Red = 4, Gold = 5, Rainbow = 6 }
 
     /// <summary>ドンのあとの出来事の時刻（秒）。起きない出来事は +∞（比較 t >= X が自然に偽になる）</summary>
     public readonly struct PromoTimes

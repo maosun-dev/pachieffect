@@ -208,7 +208,7 @@ namespace PachiMoji
                 medals[i] = MainScreen.Rect(row, "Medal" + i);
                 MainScreen.Place(medals[i], new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 110, 0), new Vector2(72, 72));
                 var mi = medals[i].gameObject.AddComponent<Image>();
-                mi.sprite = UiArt.Medal((Tier)i); mi.raycastTarget = false;
+                mi.sprite = UiArt.Medal(RangePicker.Medals[i]); mi.raycastTarget = false;
             }
             var drag = row.gameObject.AddComponent<MedalDrag>();
             drag.IndexAt = local => Mathf.Clamp(Mathf.RoundToInt(local.x / 110f) + 1, 0, 2);
@@ -372,14 +372,15 @@ namespace PachiMoji
         // 金の帯を、はじまりのメダルからおわりのメダルまで伸ばし、メダルの明るさで範囲を見せる
         void ShowRange((Tier from, Tier to) r)
         {
-            float x0 = ((int)r.from - 1) * 110, x1 = ((int)r.to - 1) * 110;
+            int from = System.Array.IndexOf(RangePicker.Medals, r.from), to = System.Array.IndexOf(RangePicker.Medals, r.to);
+            float x0 = (from - 1) * 110, x1 = (to - 1) * 110;
             MainScreen.Place(rail, new Vector2(0.5f, 0.5f), new Vector2((x0 + x1) / 2, 0), new Vector2(x1 - x0 + 40, 22));
             for (int i = 0; i < 3; i++)
             {
-                bool inside = i >= (int)r.from && i <= (int)r.to;
+                bool inside = i >= from && i <= to;
                 medals[i].GetComponent<Image>().color = inside ? Color.white : new Color(0.35f, 0.35f, 0.35f, 1);
             }
-            rangeLabel.text = r.from == r.to ? TierNames[(int)r.from] + "だけ" : TierNames[(int)r.from] + " → " + TierNames[(int)r.to];
+            rangeLabel.text = r.from == r.to ? TierNames[from] + "だけ" : TierNames[from] + " → " + TierNames[to];
         }
     }
 
