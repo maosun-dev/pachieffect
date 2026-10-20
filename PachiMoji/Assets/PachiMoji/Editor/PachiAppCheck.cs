@@ -109,22 +109,31 @@ namespace PachiMoji.EditorTools
                 Expect(EffectCatalog.Get("知らない").Id == "oudou", "知らない ID は王道昇格");
                 Expect(EffectCatalog.All[0].RequiredProduct == null, "王道昇格は無料");
 
-                // 最初の文字色と背景：ドンで着地して金に変わる前（銀の段）の姿を、色の組み合わせごとに撮る
-                foreach (var (ft, fb) in new[] { (FirstText.Silver, FirstBack.Blue), (FirstText.Blue, FirstBack.Blue), (FirstText.Green, FirstBack.Green),
-                             (FirstText.Red, FirstBack.Red), (FirstText.Purple, FirstBack.Purple), (FirstText.Red, FirstBack.Green), (FirstText.Purple, FirstBack.Red) })
+                // チラ見せの色：2文字目のまん中（文字色 金・背景 紫／文字色 虹・背景 銀）
+                foreach (var (tx, bk) in new[] { (Tier.Gold, Tier.Purple), (Tier.Rainbow, Tier.Silver) })
                 {
                     EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                    var st = PachiStage.Build(new[] { "残業", "確定です" }, 9f / 16, new EffectSettings { FirstText = ft, FirstBack = fb });
-                    st.Evaluate((st.ImpactEnd + st.GoldAt) / 2);
-                    Save(st.cam, 360, 640, Path.Combine(outDir, $"first_{ft}_{fb}.png"));
+                    var st = PachiStage.Build(new[] { "残業", "確定です" }, 9f / 16, new EffectSettings { TeaseText = tx, TeaseBack = bk });
+                    st.Evaluate(st.Tease[1].At + st.Tease[1].Len / 2);
+                    Save(st.cam, 360, 640, Path.Combine(outDir, $"tease_{tx}_{bk}.png"));
+                    st.Dispose();
+                }
+
+                // 着地の色：ドンのあと、昇格の前（銀・青・緑・紫・赤・金）
+                foreach (Tier tier in new[] { Tier.Silver, Tier.Blue, Tier.Green, Tier.Purple, Tier.Red, Tier.Gold })
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    var st = PachiStage.Build(new[] { "残業", "確定です" }, 9f / 16, new EffectSettings { Chain = new[] { tier } });
+                    st.Evaluate(st.ImpactEnd + 0.9f);
+                    Save(st.cam, 270, 480, Path.Combine(outDir, $"land_{tier}.png"));
                     st.Dispose();
                 }
 
                 // 虹で終わる演出は、最後の 0.4 秒の背景が虹のまま（余韻の青・炎への切り替えで終わらない）。動画の最後の絵になるため
-                foreach (var from in new[] { Tier.Silver, Tier.Gold, Tier.Rainbow })
+                foreach (var chain in new[] { new[] { Tier.Silver, Tier.Gold, Tier.Rainbow }, new[] { Tier.Green, Tier.Red, Tier.Rainbow }, new[] { Tier.Rainbow } })
                 {
                     EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                    var st = PachiStage.Build(Words, 9f / 16, new EffectSettings { From = from, To = Tier.Rainbow });
+                    var st = PachiStage.Build(Words, 9f / 16, new EffectSettings { Chain = chain });
                     var bg = st.cam.transform.Find("Background").GetComponent<MeshRenderer>().sharedMaterial;
                     bool rainbowEnd = true;
                     for (float k = 0; k <= 0.4f; k += 1f / 30)
@@ -132,7 +141,31 @@ namespace PachiMoji.EditorTools
                         st.Evaluate(st.End - k);
                         rainbowEnd &= Mathf.Approximately(bg.GetFloat("_Mode"), 1);
                     }
-                    Expect(rainbowEnd, $"虹で終わる演出（{from}→虹）は最後の背景が虹");
+                    Expect(rainbowEnd, $"虹で終わる演出（{Chain.Label(chain)}）は最後の背景が虹");
+                    st.Dispose();
+                }
+
+                // チラ見せ 0 文字：暗転のあと、すぐ光の放射（真っ暗のまま止まらない）
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    var st = PachiStage.Build(Words, 9f / 16, new EffectSettings { TeaseCount = 0 });
+                    Expect(st.Tease.Length == 0 && Mathf.Approximately(st.RayStart, st.TeaseStart), "チラ見せ 0 文字は暗転からすぐ光の放射");
+                    st.Evaluate(st.RayStart + PachiStage.RayLen * 0.4f);
+                    string path = Path.Combine(outDir, "tease_none_rays.png");
+                    Save(st.cam, 180, 320, path);
+                    Expect(Brightness(path, null) > 0.05f, "チラ見せ 0 文字でも光の放射が見える");
+                    st.Dispose();
+                }
+
+                // 12文字の言葉に文字数 12：12文字ぶん並び、12文字目のまん中では12文字目だけが見えている
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    var st = PachiStage.Build(new[] { "脳汁ドバドバ", "激アツ確定だ" }, 9f / 16, new EffectSettings { TeaseCount = 12 });
+                    Expect(st.Tease.Length == 12, "12文字の言葉はチラ見せ 12 文字");
+                    st.Evaluate(st.Tease[11].At + st.Tease[11].Len / 2);
+                    bool only = st.TeaseVisible(11);
+                    for (int i2 = 0; i2 < 11; i2++) only &= !st.TeaseVisible(i2);
+                    Expect(only, "12文字目のまん中では12文字目だけが見えている");
                     st.Dispose();
                 }
 

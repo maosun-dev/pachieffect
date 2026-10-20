@@ -40,13 +40,17 @@ namespace PachiMoji
         public float SlamStart => FlashStart + 0.14f;
         public float Impact => SlamStart + 0.2f;
         public float ImpactEnd => Impact + HitStop;   // 止まっていた時間が動き出す時刻
-        // ドンのあとの時刻は、昇格の範囲（設定のはじまり・おわりの色）から決める。起きない出来事は +∞
-        PromoTimes times;
-        public float GoldAt => times.GoldAt;         // 白飛びの始まり。色が切り替わるのは +WhiteGold
-        public float SlashAt => times.SlashAt;       // 金のあと、切り裂かれる
-        public float RainbowAt => times.RainbowAt;   // 灰色のタメのあと、一気に虹
-        public float SpinAt => times.SpinAt;         // 虹の1回転目の始まり（虹で着地したときは着地の少しあと）
-        public float End => times.End;
+        // ドンのあとの時刻は、昇格の色の組み合わせから決める。起きない出来事は +∞
+        PromoPlan plan;
+        public PromoPlan Plan => plan;
+        public float SlashAt => plan.SlashAt;       // 虹の手前で、切り裂かれる
+        public float RainbowAt => plan.RainbowAt;   // 灰色のタメのあと、一気に虹
+        public float SpinAt => plan.SpinAt;         // 虹の1回転目の始まり（虹で着地したときは着地の少しあと）
+        public float End => plan.End;
+        /// <summary>チラ見せの並び（1文字ずつの始まりと長さ）</summary>
+        public TeaseSlot[] Tease => tease;
+        /// <summary>チラ見せの i 文字目が今見えているか（手前確認用）</summary>
+        public bool TeaseVisible(int i) => teaseObj[i] != null && teaseObj[i].activeSelf;
 
         // ───────── 舞台の部品 ─────────
         public Camera cam;
@@ -57,14 +61,11 @@ namespace PachiMoji
         /// <summary>ドンの火花を出すか（好みで消せる）</summary>
         public bool SparksOn = true;
         EffectSettings settings;
-        string firstTint;   // 最初の文字色（null は銀のまま）
-        float firstHue;     // 最初の背景の色相の回し（度、0 は青のまま）
-        PachiText.Finish land;   // ドンで着地するときの色（昇格のはじまりの色）
         Transform bg, flashQuad, raysQuad; float aspect;
         const float IdleAspect = 2.2f;   // 待ちの姿の背景の板の横÷縦（入力の板より上の、横長の範囲を覆う）
         const float BgDist = 60;
         int teaseCount;
-        float[] teaseAt, teaseLen;   // チラ見せ1文字ずつの始まりと長さ（だんだん短く＝速くなる）
+        TeaseSlot[] tease;           // チラ見せ1文字ずつの始まりと長さ（だんだん短く＝速くなる）
         // チラ見せ用に1文字ずつ別に作った立体（となりの文字が映り込んで先に全体が見えないように）
         GameObject[] teaseObj; Vector3[] teaseC; float[] teaseSize;
         int[] teaseShot;             // 1文字ずつのカメラの動き方（TeaseShot の番号）。言葉ごとに並びが変わる
@@ -80,32 +81,22 @@ namespace PachiMoji
             settings = settings?.Clone() ?? new EffectSettings();
             st.settings = settings;
             st.SparksOn = settings.SparksOn;
-            st.land = FinishOf(settings.From);
-            st.firstTint = settings.FirstColorsApply ? FirstColors.TextBase(settings.FirstText) : null;
-            st.firstHue = settings.FirstColorsApply ? FirstColors.BackHue(settings.FirstBack) : 0;
             string font = settings.FontName;
 
             // 文字（基本の向き：斜め下から見上げて側面を見せる）
-            var go = PachiText.Create(lines, PachiText.Finish.Silver, font);
+            var go = PachiText.Create(lines, settings.Chain[0], font);
             st.text = go.transform;
             st.rig = go.GetComponent<PachiText.Rig>();
             st.textBaseRot = Quaternion.Euler(12, -24, 0);
             st.text.rotation = st.textBaseRot;
-            st.teaseCount = Mathf.Min(4, st.rig.charCenters.Count);
-            st.teaseAt = new float[st.teaseCount]; st.teaseLen = new float[st.teaseCount];
-            float cur = st.TeaseStart;
-            for (int k = 0; k < st.teaseCount; k++)
-            {
-                if (k > 0) cur += Mathf.Max(0.3f, 0.6f - 0.1f * k);   // 文字のあいだの暗転：0.5→0.4→0.3
-                st.teaseAt[k] = cur;
-                st.teaseLen[k] = Mathf.Max(0.55f, 0.9f - 0.15f * k);  // 1文字の長さ：0.9→0.75→0.6
-                cur += st.teaseLen[k];
-            }
-            st.RayStart = cur;
-            st.times = PromoTimeline.Plan(st.ImpactEnd, settings.From, settings.To);
-
-            // チラ見せ用の1文字ずつの立体。ふだんは隠しておく
+            // チラ見せ：言葉の頭から、設定の文字数ぶん（言葉より多ければ全部）
             var chars = string.Concat(lines).Replace(" ", "").Replace("　", "");
+            st.tease = TeasePlan.Plan(st.TeaseStart, settings.TeaseCount, chars.Length);
+            st.teaseCount = st.tease.Length;
+            st.RayStart = TeasePlan.End(st.TeaseStart, st.tease);
+            st.plan = PromoTimeline.Plan(st.ImpactEnd, settings.Chain);
+
+            // チラ見せ用の1文字ずつの立体（チラ見せの文字色で）。ふだんは隠しておく
             st.teaseObj = new GameObject[st.teaseCount]; st.teaseC = new Vector3[st.teaseCount]; st.teaseSize = new float[st.teaseCount];
             // カメラの動き方を、言葉から決まる乱数で並べ替える（同じ言葉なら毎回同じ。となり同士は必ず違う型）
             var shots = new List<int> { 0, 1, 2, 3, 4 };
@@ -115,7 +106,7 @@ namespace PachiMoji
             for (int k = 0; k < st.teaseCount; k++) st.teaseShot[k] = shots[k % shots.Count];
             for (int k = 0; k < st.teaseCount && k < chars.Length; k++)
             {
-                var one = PachiText.Create(new[] { chars[k].ToString() }, PachiText.Finish.Silver, font);
+                var one = PachiText.Create(new[] { chars[k].ToString() }, settings.TeaseText, font);
                 var ob = one.GetComponent<MeshRenderer>().bounds;
                 st.teaseC[k] = ob.center;
                 // 縦長の画面なので、高さと「横幅÷画面の縦横比」の大きい方に合わせる
@@ -237,7 +228,7 @@ namespace PachiMoji
             for (int i = 0; i < teaseCount; i++) if (teaseObj[i] != null) teaseObj[i].SetActive(false);
             text.rotation = textBaseRot * Quaternion.Euler(Mathf.Sin(t * 0.45f) * 1.5f, Mathf.Sin(t * 0.7f) * 6, 0);
             text.localScale = Vector3.one;
-            PachiText.SetLook(rig, PachiText.Finish.Silver, PachiText.Finish.Silver, 0, 1.5f);
+            PachiText.SetLook(rig, Tier.Silver, Tier.Silver, 0, 1.5f);
             PachiText.SetHeat(rig, 0, 0, 0);
             for (int i = 0; i < rig.glints.Count; i++)
             {
@@ -260,6 +251,8 @@ namespace PachiMoji
 
             bgMat.SetFloat("_T", t);
             bgMat.SetFloat("_Mode", 2);
+            bgMat.SetFloat("_HueRot", 0);
+            bgMat.SetFloat("_Desat", 0);
             bgMat.SetFloat("_Gain", 0.22f);
             bgMat.SetFloat("_Core", 0.8f);
             bgMat.SetFloat("_Bolts", 0);
@@ -282,8 +275,14 @@ namespace PachiMoji
             raysQuad.localScale = new Vector3(h * aspect * 0.21f / 0.2f, h * 0.21f / 0.2f, 1);
         }
 
-        static PachiText.Finish FinishOf(Tier t) =>
-            t == Tier.Gold ? PachiText.Finish.Gold : t == Tier.Rainbow ? PachiText.Finish.Rainbow : PachiText.Finish.Silver;
+        /// <summary>色の格の背景：銀は色を抜いた灰、青〜赤は青の背景の色相を回す、金は炎、虹は虹（mode 0 炎・1 虹・2 青）</summary>
+        static (float mode, float hue, float desat) BackOf(Tier t) => TierColors.Back(t) switch
+        {
+            BackKind.Gray => (2, 0, 1),
+            BackKind.Fire => (0, 0, 0),
+            BackKind.Rainbow => (1, 0, 0),
+            _ => (2, TierColors.BackHue(t), 0),
+        };
 
         // プチュンの光の色（虹はシェーダーの中で色相を回すので、ここは使わない）
         static Color LightTint(LightColor c) => c switch
@@ -363,9 +362,8 @@ namespace PachiMoji
             Vector3 camPos = camBasePos; Quaternion camRot = camBaseRot;
             float shake = 0;
             Color flash = new Color(0, 0, 0, 0);
-            var look = (PachiText.Finish.Silver, PachiText.Finish.Silver, 0f);
-            string tint = null;   // 銀の見た目に乗せる色（ドンの段だけ）
-            float bgHue = 0;      // 青の背景の色相の回し（ドンの段だけ）
+            var look = (Tier.Silver, Tier.Silver, 0f);
+            float bgHue = 0, bgDesat = 0;   // 青の背景の色相の回し・色の抜き（色の格の背景）
             float lookGlow = 1.5f;
             float white = 0, hue = 0;
             float bgMode = 0, bgGain = 1, bgCore = 1, bgBolts = 1, bgSparks = 1, bgRays = 0, bgReach = 2, fgRays = 0, fgReach = 2;
@@ -402,10 +400,19 @@ namespace PachiMoji
                 // 暗転 → チラ見せ（1文字ずつ、立体のまわりを回り込む）→ 文字の裏から光が吹き出す
                 int k = -1; float lt = 0, len = 1;
                 for (int i = 0; i < teaseCount; i++)
-                    if (t >= teaseAt[i] && (t < teaseAt[i] + teaseLen[i] || (i == teaseCount - 1 && t >= RayStart)))
-                    { k = i; lt = t - teaseAt[i]; len = teaseLen[i]; }
+                    if (t >= tease[i].At && (t < tease[i].At + tease[i].Len || (i == teaseCount - 1 && t >= RayStart)))
+                    { k = i; lt = t - tease[i].At; len = tease[i].Len; }
                 textOn = false;
-                if (k < 0) { bgGain = 0; }   // 暗転・無音
+                bool rays = t >= RayStart;
+                // チラ見せの背景：チラ見せの背景の色の暗がり。文字の後ろだけほんのり光る
+                (bgMode, bgHue, bgDesat) = BackOf(settings.TeaseBack);
+                bgGain = 0.2f; bgCore = 0.8f; bgBolts = 0; bgSparks = 0.5f;
+                if (k < 0 && !rays) { bgGain = 0; }   // 暗転・無音
+                else if (k < 0)
+                {
+                    // チラ見せ 0 文字：文字は見せず、基本の位置から光の放射だけ
+                    fov = BaseFov;
+                }
                 else
                 {
                     // 1文字まるごと見える距離から、文字ごとに違う動きで立体をなめるように映す
@@ -415,19 +422,18 @@ namespace PachiMoji
                     fov = 38;
                     float d = teaseSize[k] * 0.5f / Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) / 0.9f;   // 画面の約9割に収める
                     TeaseShot(teaseShot[k], teaseC[k], d, teaseSize[k], u, dir, out camPos, out camRot);
-                    bgMode = 2; bgGain = 0.2f; bgCore = 0.8f; bgBolts = 0; bgSparks = 0.5f;   // 暗い青。文字の後ろだけほんのり光る
                     flash = new Color(0, 0, 0, 1 - Clamp01(lt / 0.1f));   // 暗転からすっと出る
-                    shake = 0.012f * Decay(t, teaseAt[k], 10);
-                    if (t >= RayStart)
-                    {
-                        // 光の放射：文字の裏から光の筋が伸び、最後は白く飛ぶ
-                        float rp = (t - RayStart) / RayLen;
-                        fgRays = 0.25f + rp * 1.0f; fgReach = Mathf.Lerp(0.15f, 2.2f, Mathf.Pow(rp, 0.7f));
-                        bgGain = Mathf.Lerp(0.2f, 1.3f, rp); bgCore = Mathf.Lerp(0.8f, 1.5f, rp);
-                        float wa = Mathf.SmoothStep(0, 1, (rp - 0.55f) / 0.45f);
-                        flash = new Color(1, 1, 1, wa);
-                        shake = 0.006f + 0.02f * rp;
-                    }
+                    shake = 0.012f * Decay(t, tease[k].At, 10);
+                }
+                if (rays)
+                {
+                    // 光の放射：文字の裏から光の筋が伸び、最後は白く飛ぶ
+                    float rp = (t - RayStart) / RayLen;
+                    fgRays = 0.25f + rp * 1.0f; fgReach = Mathf.Lerp(0.15f, 2.2f, Mathf.Pow(rp, 0.7f));
+                    bgGain = Mathf.Lerp(0.2f, 1.3f, rp); bgCore = Mathf.Lerp(0.8f, 1.5f, rp);
+                    float wa = Mathf.SmoothStep(0, 1, (rp - 0.55f) / 0.45f);
+                    flash = new Color(1, 1, 1, wa);
+                    shake = 0.006f + 0.02f * rp;
                 }
             }
             else if (t < SlamStart)
@@ -438,15 +444,20 @@ namespace PachiMoji
             }
             else
             {
-                var g = PromoAt(t, GoldAt, WhiteGold);
+                // 昇格：前ぶれ・白飛びは「次の段」、跳ね・閃光は「直前の段」から
+                int n = plan.SnappedCount(t);
+                var g = n < plan.Steps.Length ? PromoAt(t, plan.Steps[n].WhiteAt, WhiteGold) : new Promo { x = -1 };
+                g.snapped = n > 0;
+                g.x = n > 0 ? t - plan.Steps[n - 1].SnapAt : -1;
                 bool cut = t >= SlashAt && t < RainbowAt;          // 切り裂かれて灰色でタメている間
                 bool rain = t >= RainbowAt;                         // 昇格して虹になった（虹で着地したときは偽）
                 float rx = t - RainbowAt;
-                bool goldLand = land == PachiText.Finish.Gold, rainLand = land == PachiText.Finish.Rainbow;
+                // 銀・虹以外で着地したときは、着地のあとに光の筋を出す（今の金で着地したときと同じ）
+                bool shineLand = plan.Land != Tier.Silver && plan.Land != Tier.Rainbow, rainLand = plan.Land == Tier.Rainbow;
                 float spinEnd = SpinAt + 2 * Spin + SpinRest;
                 if (t < Impact)
                 {
-                    // 銀の文字が手前から飛んできて、ドン
+                    // 着地の色の文字が手前から飛んできて、ドン
                     float k = (t - SlamStart) / (Impact - SlamStart);
                     scale = Mathf.Lerp(3.5f, 1f, k * k);
                     flash = new Color(1, 1, 1, 1 - k * 0.75f);
@@ -473,10 +484,9 @@ namespace PachiMoji
                     glint = cut ? 0 : 1;
                 }
 
-                // 今の色：銀 → 金（白飛びのあと一瞬で切り替える）→ 切り裂かれて灰色 → 一気に虹
-                var fin = rain ? PachiText.Finish.Rainbow : g.snapped ? PachiText.Finish.Gold : land;
+                // 今の色：着地の色 → 段ごとに白飛びのあと一瞬で切り替える → 切り裂かれて灰色 → 一気に虹
+                var fin = plan.TierAt(t);
                 look = (fin, fin, 0f);
-                tint = firstTint;
 
                 float pre = rain ? 0 : g.pre;
                 float pop = rain ? Mathf.Exp(-rx * 4) : g.snapped ? Mathf.Exp(-g.x * 5) : 0;
@@ -486,14 +496,13 @@ namespace PachiMoji
                 scale *= 1 - 0.03f * pre;
                 if (rain || g.snapped) scale *= 1 + (rain ? 0.22f : 0.17f) * Mathf.Exp(-since * 6) * Mathf.Cos(since * 16);   // 跳ねて戻る
 
-                // 金に変わったあと、表面を光の筋が1本サッと横切る
-                // 金で着地したときは、着地のあとに同じ筋を出す
-                float gx = goldLand ? t - ImpactEnd : g.x;
-                if (!rain && !cut && (g.snapped || goldLand) && gx > 0.2f && gx < 0.65f) { look = (fin, fin, (gx - 0.2f) / 0.45f); lookGlow = 2.8f; }
+                // 段が切り替わったあと、表面を光の筋が1本サッと横切る
+                // 銀・虹以外で着地したときは、着地のあとに同じ筋を出す
+                float gx = g.snapped ? g.x : shineLand ? t - ImpactEnd : -1;
+                if (!rain && !cut && gx > 0.2f && gx < 0.65f) { look = (fin, fin, (gx - 0.2f) / 0.45f); lookGlow = 2.8f; }
 
-                // 背景：銀は青、金は炎、虹は虹（ときどき青・炎に切り替わり続ける）
-                if (fin == PachiText.Finish.Silver) { bgMode = 2; bgHue = firstHue; }
-                else if (fin == PachiText.Finish.Gold) bgMode = 0;
+                // 背景：色の格の背景。虹はときどき青・炎に切り替わり続ける
+                if (fin != Tier.Rainbow) (bgMode, bgHue, bgDesat) = BackOf(fin);
                 else
                 {
                     int[] cyc = { 1, 1, 1, 2, 1, 1, 0 };
@@ -507,7 +516,7 @@ namespace PachiMoji
                 // ドン・切り替えの瞬間：白く光って、揺れる
                 float f1 = 0.75f * Decay(t, ImpactEnd, 5);
                 float fa = Mathf.Max(f1, (rain ? 0.9f : 0.7f) * ((rain || g.snapped) ? Mathf.Exp(-since * 12) : 0));
-                if (t >= ImpactEnd) flash = fin == PachiText.Finish.Silver ? new Color(1, 1, 1, fa) : new Color(1, 0.95f, 0.8f, fa);
+                if (t >= ImpactEnd) flash = fin == Tier.Silver ? new Color(1, 1, 1, fa) : new Color(1, 0.95f, 0.8f, fa);
                 // 前ぶれ：画面全体をふっと暗くする
                 if (pre > 0 && fa < 0.05f) flash = new Color(0, 0, 0, 0.45f * pre);
                 shake = Decay(t, ImpactEnd, 6) * 0.07f + pop * (rain ? 0.1f : 0.08f) + pre * 0.012f;
@@ -533,7 +542,7 @@ namespace PachiMoji
                     slash = 0.85f + 0.15f * Mathf.Sin(t * 53) * Mathf.Sin(t * 31);
                     gray = Clamp01((sl - SlashDraw * 0.5f) / 0.08f);
                     float hold = Clamp01((sl - SlashDraw) / GrayHold);
-                    bgMode = 2; bgGain = Mathf.Lerp(0.6f, 0.1f, Clamp01(sl / 0.25f)); bgBolts = 0; bgSparks = 0.2f; bgCore = 0.3f;
+                    bgMode = 2; bgHue = 0; bgDesat = 0; bgGain = Mathf.Lerp(0.6f, 0.1f, Clamp01(sl / 0.25f)); bgBolts = 0; bgSparks = 0.2f; bgCore = 0.3f;
                     bgRays = 0; fgRays = 0;
                     float hit = Mathf.Exp(-Mathf.Max(0, sl - SlashDraw) * 10) * (sl >= SlashDraw * 0.5f ? 1 : 0);
                     flash = new Color(0.9f, 0.4f, 1f, 0.45f * hit);
@@ -560,7 +569,7 @@ namespace PachiMoji
             }
             text.rotation = rot;
             text.localScale = Vector3.one * scale;
-            PachiText.SetLook(rig, look.Item1, look.Item2, look.Item3, lookGlow, tint);
+            PachiText.SetLook(rig, look.Item1, look.Item2, look.Item3, lookGlow);
             PachiText.SetHeat(rig, white, hue, gray);
             for (int i = 0; i < rig.glints.Count; i++)
             {
@@ -585,6 +594,7 @@ namespace PachiMoji
             bgMat.SetFloat("_T", bt);
             bgMat.SetFloat("_Mode", bgMode);
             bgMat.SetFloat("_HueRot", bgHue);
+            bgMat.SetFloat("_Desat", bgDesat);
             bgMat.SetFloat("_Gain", bgGain);
             bgMat.SetFloat("_Core", bgCore);
             bgMat.SetFloat("_Bolts", bgBolts);

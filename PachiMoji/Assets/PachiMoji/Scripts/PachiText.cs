@@ -29,7 +29,21 @@ namespace PachiMoji
             public Mesh mesh;                                         // 作った立体（片付けるときに消す）
         }
 
-        public static GameObject Create(string[] lines, Finish finish, string fontName = "ReggaeOne", PachiTextBuilder.Style style = null)
+        /// <summary>色の格 → 見た目（青〜赤は銀の対応表に色を乗せる）</summary>
+        public static (Finish finish, string tint) LookOf(Tier t) => t switch
+        {
+            Tier.Gold => (Finish.Gold, null),
+            Tier.Rainbow => (Finish.Rainbow, null),
+            _ => (Finish.Silver, TierColors.TextBase(t)),
+        };
+
+        public static GameObject Create(string[] lines, Tier tier, string fontName = "ReggaeOne", PachiTextBuilder.Style style = null)
+        {
+            var (finish, tint) = LookOf(tier);
+            return Create(lines, finish, fontName, style, tint);
+        }
+
+        public static GameObject Create(string[] lines, Finish finish, string fontName = "ReggaeOne", PachiTextBuilder.Style style = null, string tint = null)
         {
             style ??= PachiTextBuilder.DefaultStyle();
             var font = LoadFont(fontName);
@@ -41,7 +55,7 @@ namespace PachiMoji
             var go = new GameObject("PachiText " + mesh.name);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterials = Materials(finish);
+            mr.sharedMaterials = Materials(finish, tint);
             var rig = go.AddComponent<Rig>();
             rig.mats = mr.sharedMaterials;
             rig.mesh = mesh;
@@ -101,11 +115,12 @@ namespace PachiMoji
         /// <summary>
         /// 見た目を切り替える。from の見た目の上に、左から wipe（0〜1）の割合まで to の見た目を塗る。
         /// wipe=0 なら from だけ、1 なら to だけ。glow は境目の光の帯の強さ。
-        /// silverTint（#RRGGBB）を渡すと、銀の見た目にその色を乗せる（最初の文字色）
         /// </summary>
-        public static void SetLook(Rig rig, Finish from, Finish to, float wipe, float glow, string silverTint = null)
+        public static void SetLook(Rig rig, Tier from, Tier to, float wipe, float glow)
         {
-            var ra = Ramps(from, silverTint); var rb = Ramps(to, silverTint);
+            var (fa, ta) = LookOf(from);
+            var (fb, tb) = LookOf(to);
+            var ra = Ramps(fa, ta); var rb = Ramps(fb, tb);
             float wx = wipe <= 0 ? -100000 : wipe >= 1 ? 100000 : Mathf.Lerp(rig.minX, rig.maxX, wipe);
             for (int i = 0; i < rig.mats.Length; i++)
             {
@@ -132,17 +147,10 @@ namespace PachiMoji
         }
 
         /// <summary>サブメッシュ順：表の面・細い線・黒・外フチ・側面</summary>
-        public static Material[] Materials(Finish f)
+        public static Material[] Materials(Finish f, string tint = null)
         {
-            switch (f)
-            {
-                case Finish.Silver:
-                    return new[] { Metal("silver"), Metal("silverLine"), Metal("black", false, 0), Metal("silver"), SideMetal("silverSide") };
-                case Finish.Rainbow:
-                    return new[] { Metal(null, true, 2), Metal("silverLine"), Metal("black", false, 0), Metal("goldRim"), SideMetal("goldSide") };
-                default:
-                    return new[] { Metal("gold"), Metal("goldLine"), Metal("black", false, 0), Metal("goldRim"), SideMetal("goldSide") };
-            }
+            var r = Ramps(f, tint);
+            return new[] { r[0] == null ? Metal(null, true, 2) : Metal(r[0]), Metal(r[1]), Metal("black", false, 0), Metal(r[3]), SideMetal(r[4]) };
         }
     }
 }
