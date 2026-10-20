@@ -145,6 +145,18 @@ namespace PachiMoji.EditorTools
                     st.Dispose();
                 }
 
+                // ふだんの文字は、昇格の最初の色に関係なく銀で作る（光の強さ・角のキラッの色が前の版と同じになるように。色は毎コマ切り替える）
+                {
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                    var st = PachiStage.Build(Words, 9f / 16, new EffectSettings { Chain = new[] { Tier.Rainbow } });
+                    var silver = PachiText.Materials(PachiText.Finish.Silver);
+                    Expect(Mathf.Approximately(st.rig.mats[0].GetFloat("_Boost"), silver[0].GetFloat("_Boost"))
+                           && st.rig.glints.Count > 0 && st.rig.glints[0].sharedMaterial.GetColor("_Color") == new Color(0.85f, 0.92f, 1f),
+                        "虹で始まる人も、ふだんの文字は銀で作る");
+                    foreach (var m in silver) UnityEngine.Object.DestroyImmediate(m);
+                    st.Dispose();
+                }
+
                 // チラ見せ 0 文字：暗転のあと、すぐ光の放射（真っ暗のまま止まらない）
                 {
                     EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);

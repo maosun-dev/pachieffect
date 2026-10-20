@@ -84,7 +84,8 @@ namespace PachiMoji
             string font = settings.FontName;
 
             // 文字（基本の向き：斜め下から見上げて側面を見せる）
-            var go = PachiText.Create(lines, settings.Chain[0], font);
+            // 銀で作り、色は毎コマ SetLook で切り替える（作るときに決まる光の強さ・角のキラッの色を、前の版と同じにするため）
+            var go = PachiText.Create(lines, Tier.Silver, font);
             st.text = go.transform;
             st.rig = go.GetComponent<PachiText.Rig>();
             st.textBaseRot = Quaternion.Euler(12, -24, 0);
