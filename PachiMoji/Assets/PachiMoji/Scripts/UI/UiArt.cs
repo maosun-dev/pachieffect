@@ -100,6 +100,54 @@ namespace PachiMoji
             return ToSprite(px, N, N, Vector4.zero);
         });
 
+        /// <summary>買い物：玉貸機の銀の投入口に、金のメダルが半分沈みかけている</summary>
+        public static Sprite Shop() => Cached("shop", () =>
+        {
+            const int N = 128;
+            const float CoinY = 0.16f, CoinR = 0.66f;
+            const float SlotY = -0.6f, SlotW = 0.96f, SlotH = 0.26f, SlotRad = 0.2f, SlitW = 0.68f, SlitH = 0.07f;
+            float aa = N * 0.5f;   // 1画素ぶんの距離
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float nx = (x + 0.5f) / N * 2 - 1, ny = (y + 0.5f) / N * 2 - 1;
+                    var c = new Color(0, 0, 0, 0);
+
+                    // メダル（投入口の奥へ沈むので、投入口の上の辺より下は切り口で消える）
+                    float cx = nx, cy = ny - CoinY, cr = Mathf.Sqrt(cx * cx + cy * cy) / CoinR;
+                    float coinA = Mathf.Clamp01((1 - cr) * CoinR * aa + 0.5f) * Mathf.Clamp01((ny - (SlotY + SlitH)) * aa + 0.5f);
+                    if (coinA > 0)
+                    {
+                        float k = Mathf.Clamp01(cr * 0.8f - cy / CoinR * 0.4f + 0.15f);
+                        var face = Color.Lerp(UiTheme.Hex(0xFFEAA6), UiTheme.Hex(0xA8720E), k);
+                        if (cr > 0.84f) face *= 0.62f + 0.3f * (cy / CoinR);   // 外のフチ
+                        else if (cr > 0.62f && cr < 0.7f) face *= 0.68f;       // 刻んだ輪
+                        float hx = (cx / CoinR + 0.32f) / 0.32f, hy = (cy / CoinR - 0.36f) / 0.2f;
+                        face = Color.Lerp(face, Color.white, Mathf.Clamp01(1 - (hx * hx + hy * hy)) * 0.55f);   // 左上の照り返し
+                        face.a = coinA;
+                        c = face;
+                    }
+
+                    // 投入口：銀の枠（角の丸い横長）と、まん中の黒い切り口
+                    float qx = Mathf.Max(Mathf.Abs(nx) - (SlotW - SlotRad), 0), qy = Mathf.Max(Mathf.Abs(ny - SlotY) - (SlotH - SlotRad), 0);
+                    float slot = SlotRad - Mathf.Sqrt(qx * qx + qy * qy);   // 枠の内側でプラス
+                    float slotA = Mathf.Clamp01(slot * aa + 0.5f);
+                    if (slotA > 0)
+                    {
+                        float u = Mathf.Clamp01(slot / SlotRad);
+                        Color frame = ChromeAt(u, (ny - SlotY) / SlotH, 1.05f);
+                        float sx = Mathf.Max(Mathf.Abs(nx) - (SlitW - SlitH), 0), sy = ny - SlotY;
+                        float slit = Mathf.Clamp01((SlitH - Mathf.Sqrt(sx * sx + sy * sy)) * aa + 0.5f);   // 両端の丸い切り口の中で 1
+                        frame = Color.Lerp(frame, UiTheme.Hex(0x050608), slit);
+                        c = Color.Lerp(c, frame, slotA);
+                        c.a = Mathf.Max(c.a, slotA);
+                    }
+                    px[y * N + x] = c;
+                }
+            return ToSprite(px, N, N, Vector4.zero);
+        });
+
         /// <summary>昇格の色のメダル：銀・青・緑・紫・赤・金・虹（青〜赤は銀の金属の明るさに色を乗せる）</summary>
         public static Sprite Medal(Tier t) => Cached("medal" + t, () =>
         {

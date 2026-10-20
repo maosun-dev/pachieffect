@@ -3,7 +3,7 @@ using UnityEngine;
 namespace PachiMoji
 {
     /// <summary>アプリの状態：入力を待つ・再生中・終わって止まっている・設定画面・書き出し中・書き出しできた</summary>
-    public enum AppState { Idle, Playing, Finished, Settings, Exporting, Exported }
+    public enum AppState { Idle, Playing, Finished, Settings, Exporting, Exported, Shop }
 
     /// <summary>再生の時計。裏に回して戻っても、続きから流れる（終わりに飛ばない）</summary>
     public static class PlayClock

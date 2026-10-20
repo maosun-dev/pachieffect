@@ -11,9 +11,9 @@ namespace PachiMoji
     /// 設定画面：火花・プチュンの光の色と大きさ・書体・昇格の色・チラ見せの文字数と色。黒い全面が下からせり上がる。
     /// 項目は縦に動かせる（見出しと「もどる」は動かない）。
     /// 選んでいるものは金の文字と細い金の線。変えたらすぐ onChanged を呼ぶ（保存は PachiApp）。
-    /// いちばん下に買い物（印を消す・広告を消す・セット、購入を復元）。値段と買ったものは ShowShop で描き直す。
+    /// 買い物は別の画面（ShopScreen）。
     /// </summary>
-    public class SettingsScreen
+    public class SettingsScreen : ICover
     {
         public Button Back;
         RectTransform panel; CanvasGroup group;
@@ -25,20 +25,7 @@ namespace PachiMoji
 
         /// <summary>昇格の色の文字（「緑 → 赤 → 虹」）</summary>
         public TMP_Text ChainLabel { get; private set; }
-        RectTransform content, shopBox; float shopTop; TMP_Text shopNotice;
-        readonly List<GameObject> shopRows = new List<GameObject>();
-
-        /// <summary>商品の板を押したとき（商品 ID）</summary>
-        public Action<string> Buy;
-        public Button Restore;
-
-        // 商品の名前と説明（どれも買い切り）
-        static readonly Dictionary<string, (string name, string note)> Products = new Dictionary<string, (string, string)>
-        {
-            [ProductIds.NoMark] = ("印を消す", "動画の右下の「脳汁メーカー」を消します"),
-            [ProductIds.NoAds] = ("広告を消す", "広告を消し、ネットなしでも書き出せます"),
-            [ProductIds.Set] = ("セット", "印と広告を、どちらも消します"),
-        };
+        RectTransform content;
 
         public static SettingsScreen Build(RectTransform canvasRoot, Rect safePx, Vector2 screenPx,
             EffectSettings settings, Action<EffectSettings> onChanged)
@@ -95,7 +82,7 @@ namespace PachiMoji
                 i => settings.TeaseText = (Tier)i, TierTextColors());
             m.Choice(parent, ref y, "チラ見せの背景", TierNames7(), null, (int)settings.TeaseBack, 44,
                 i => settings.TeaseBack = (Tier)i, TierTextColors());
-            m.ShopSection(parent, y);
+            content.sizeDelta = new Vector2(0, -y + 24);
 
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
             m.Show(false);
@@ -108,9 +95,6 @@ namespace PachiMoji
             var view = (RectTransform)scroll.transform;
             view.offsetMin = new Vector2(0, on ? UiTheme.BannerHeight : 0);
         }
-
-        /// <summary>いま見せている商品の数</summary>
-        public int ShopItemCount { get; private set; }
 
         /// <summary>縦の位置（1＝いちばん上、0＝いちばん下）</summary>
         public void ScrollTo(float normalized)
@@ -330,100 +314,6 @@ namespace PachiMoji
         };
 
         static string[] TierNames7() => System.Array.ConvertAll((Tier[])System.Enum.GetValues(typeof(Tier)), TierColors.Name);
-
-        // 買い物：見出し・商品の板（作り直す）・買ったもの・購入を復元・知らせ
-        void ShopSection(RectTransform parent, float y)
-        {
-            var head = MainScreen.Rect(parent, "ShopHead");
-            MainScreen.Place(head, new Vector2(0.5f, 1), new Vector2(0, y - 8), new Vector2(340, 22));
-            MainScreen.Label(head, "買い物", UiTheme.Body, 13, UiTheme.Muted).alignment = TextAlignmentOptions.Left;
-            shopBox = MainScreen.Rect(parent, "Shop");
-            shopBox.anchorMin = new Vector2(0, 1); shopBox.anchorMax = new Vector2(1, 1);
-            shopBox.pivot = new Vector2(0.5f, 1);
-            shopTop = y - 36;
-            Restore = MainScreen.PlateButton(shopBox, "購入を復元", new Vector2(0.5f, 1), Vector2.zero, new Vector2(150, 40), UiTheme.Body, 14, UiTheme.Chrome);
-            var notice = MainScreen.Rect(shopBox, "ShopNotice");
-            notice.anchorMin = notice.anchorMax = new Vector2(0.5f, 1);
-            notice.pivot = new Vector2(0.5f, 1);
-            notice.sizeDelta = new Vector2(340, 36);
-            shopNotice = MainScreen.Label(notice, "", UiTheme.Body, 12, UiTheme.Muted);
-            shopNotice.textWrappingMode = TextWrappingModes.Normal;
-            ShowShop(new Entitlements(new string[0]), ShopState.Connecting, _ => null);
-        }
-
-        /// <summary>
-        /// 買い物を今の状態で描き直す。見せる商品は Entitlements.ShopItems（セットは何も買っていない人だけ）。
-        /// 値段がまだ無い・ストアにつながらないときは「—」で押せない。買ったものは金の字で並べる
-        /// </summary>
-        public void ShowShop(Entitlements owned, ShopState state, Func<string, string> priceOf)
-        {
-            foreach (var go in shopRows)
-                if (Application.isPlaying) UnityEngine.Object.Destroy(go); else UnityEngine.Object.DestroyImmediate(go);
-            shopRows.Clear();
-            float y = 0;
-            var items = owned.ShopItems;
-            ShopItemCount = items.Length;
-            foreach (var id in items)
-            {
-                string price = state == ShopState.Ready ? priceOf(id) : null;
-                shopRows.Add(ShopPlate(id, price, ref y));
-            }
-
-            var bought = new List<string>();
-            if (owned.Owns(ProductIds.NoMark)) bought.Add(Products[ProductIds.NoMark].name);
-            if (owned.Owns(ProductIds.NoAds)) bought.Add(Products[ProductIds.NoAds].name);
-            if (bought.Count > 0)
-            {
-                var line = MainScreen.Rect(shopBox, "Bought");
-                MainScreen.Place(line, new Vector2(0.5f, 1), new Vector2(0, y - 14), new Vector2(340, 28));
-                var t = MainScreen.Label(line, "買ったもの：" + string.Join("、", bought), UiTheme.Display, 16, UiTheme.Gold);
-                t.alignment = TextAlignmentOptions.Left;
-                shopRows.Add(line.gameObject);
-                y -= 36;
-            }
-
-            y -= 8;
-            var restore = (RectTransform)Restore.transform;
-            restore.anchoredPosition = new Vector2(0, y - 20);
-            Restore.interactable = state != ShopState.Connecting;
-            y -= 48;
-            ((RectTransform)shopNotice.transform.parent).anchoredPosition = new Vector2(0, y);
-            if (state == ShopState.Unavailable) shopNotice.text = "いまは買えません。ネットにつないで、開き直してください";
-            else if (shopNotice.text == "いまは買えません。ネットにつないで、開き直してください") shopNotice.text = "";
-            y -= 44;
-
-            shopBox.anchoredPosition = new Vector2(0, shopTop);
-            shopBox.sizeDelta = new Vector2(0, -y);
-            content.sizeDelta = new Vector2(0, -(shopTop + y) + 24);
-            MainScreen.SetLayer(shopBox.gameObject, MainScreen.UiLayer);
-        }
-
-        /// <summary>買い物の知らせ（購入しました・承認待ち・復元の結果など）</summary>
-        public void ShowShopNotice(string text) => shopNotice.text = text;
-
-        // 商品1つ：銀の板に名前（左）・値段（右）・説明（灰）。押すと Buy
-        GameObject ShopPlate(string id, string price, ref float y)
-        {
-            var (name, note) = Products[id];
-            var b = MainScreen.PlateButton(shopBox, name, new Vector2(0.5f, 1), new Vector2(0, y - 36), new Vector2(340, 68),
-                UiTheme.Display, 19, UiTheme.Chrome);
-            var title = b.GetComponentInChildren<TMP_Text>();
-            title.alignment = TextAlignmentOptions.TopLeft;
-            title.rectTransform.offsetMin = new Vector2(18, 0);
-            title.rectTransform.offsetMax = new Vector2(-90, -10);
-            var desc = MainScreen.Label((RectTransform)b.transform, note, UiTheme.Body, 11, UiTheme.Muted);
-            desc.alignment = TextAlignmentOptions.BottomLeft;
-            desc.enableAutoSizing = true; desc.fontSizeMin = 9; desc.fontSizeMax = 11;   // 1行に収める（名前と重ならないように）
-            desc.rectTransform.offsetMin = new Vector2(18, 11);
-            desc.rectTransform.offsetMax = new Vector2(-90, 0);
-            var cost = MainScreen.Label((RectTransform)b.transform, price ?? "—", UiTheme.Display, 22, price != null ? UiTheme.Chrome : UiTheme.Muted);
-            cost.alignment = TextAlignmentOptions.Right;
-            cost.rectTransform.offsetMax = new Vector2(-18, 0);
-            b.interactable = price != null;
-            b.onClick.AddListener(() => Buy?.Invoke(id));
-            y -= 76;
-            return b.gameObject;
-        }
 
         static Color Hex(string hex)
         {

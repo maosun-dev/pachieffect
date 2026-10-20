@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace PachiMoji
 {
     /// <summary>
-    /// メイン画面（1画面だけ）の組み立て。上は演出の舞台、その下に台の下皿まわりのような銀の板（入力欄）、
+    /// メイン画面の組み立て（設定と買い物は、上に重なる別の画面）。上は演出の舞台、その下に台の下皿まわりのような銀の板（入力欄）、
     /// まん中に赤いチャンスボタン（PUSH）、いちばん下はバナー広告の場所。
     /// 部品の置き場所だけを持ち、流れ（いつ何を出すか）は PachiApp が決める。
     /// </summary>
@@ -15,14 +15,14 @@ namespace PachiMoji
         public const int UiLayer = 5;
 
         public TMP_InputField Line1, Line2;
-        public Button Push, Again, Export, ChangeWords, Gear;
+        public Button Push, Again, Export, ChangeWords, Gear, ShopButton;
         public TMP_Text Notice;
         public RawImage ExportView;                          // 書き出している板（9:16）を範囲に収めて見せる
         public Button CancelExport, SavePhoto, Share, CloseExport;
         public TMP_Text EndNotice;                           // 終わり・できたの画面の知らせ（失敗の直し方・保存しました）
         public RectTransform StageIdleArea, StagePlayArea;   // 舞台の絵を置く範囲（待ち・再生）
         public RawImage StageView;                           // 舞台の絵を貼る板（StageScreen が使う）
-        RectTransform deck; CanvasGroup deckGroup, endGroup, gearGroup, changeGroup;
+        RectTransform deck; CanvasGroup deckGroup, endGroup, gearGroup, shopGroup, changeGroup;
         CanvasGroup runGroup, doneGroup, closeGroup, endNoticeGroup;
         TMP_Text percentLabel, saveLabel; RectTransform progressFill; float progressWidth;
         Image dome; TMP_Text pushLabel;
@@ -121,6 +121,16 @@ namespace PachiMoji
             gearIcon.gameObject.AddComponent<Image>().sprite = UiArt.Gear();
             m.gearGroup = gear.gameObject.AddComponent<CanvasGroup>();
 
+            // 右上・歯車の左：買い物（玉貸機の投入口）
+            var shop = Rect(safe, "ShopButton");
+            Place(shop, new Vector2(1, 1), new Vector2(-80, -30), new Vector2(44, 44));
+            shop.gameObject.AddComponent<Image>().color = Color.clear;   // 押せる範囲
+            m.ShopButton = shop.gameObject.AddComponent<Button>();
+            var shopIcon = Rect(shop, "Icon");
+            Place(shopIcon, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(30, 30));
+            shopIcon.gameObject.AddComponent<Image>().sprite = UiArt.Shop();
+            m.shopGroup = shop.gameObject.AddComponent<CanvasGroup>();
+
             // 左上：言葉を変える（終わったあとだけ）
             m.ChangeWords = PlateButton(safe, "言葉を変える", new Vector2(0, 1), new Vector2(76, -32), new Vector2(136, 44), UiTheme.Body, 15, UiTheme.Chrome);
             m.changeGroup = m.ChangeWords.gameObject.AddComponent<CanvasGroup>();
@@ -150,8 +160,9 @@ namespace PachiMoji
         /// <summary>状態に合わせて部品を出し分ける（台の沈み込みは SetDeckSink で別に動かす）</summary>
         public void ShowState(AppState s)
         {
-            bool idle = s == AppState.Idle || s == AppState.Settings;
+            bool idle = s == AppState.Idle || s == AppState.Settings || s == AppState.Shop;
             Show(gearGroup, idle);
+            Show(shopGroup, idle);
             bool exporting = s == AppState.Exporting, exported = s == AppState.Exported;
             Show(endGroup, s == AppState.Finished);
             Show(changeGroup, s == AppState.Finished);

@@ -215,6 +215,8 @@ namespace PachiMoji.EditorTools
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_changed.png"), new EffectSettings
                     { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho });
+                // いちばん下まで動かした姿（買い物は別の画面へ移したので、チラ見せの背景で終わる）
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_bottom.png"), new EffectSettings(), bottom: true);
                 // 昇格の色・チラ見せ（iPhone SE の 9:16 で、まん中あたりまで動かした姿）
                 var chainSettings = new EffectSettings { Chain = new[] { Tier.Green, Tier.Red, Tier.Rainbow }, TeaseCount = 3, TeaseText = Tier.Gold, TeaseBack = Tier.Purple };
                 ShotSettings(720, 1280, Path.Combine(outDir, "settings_chain.png"), chainSettings, sc =>
@@ -233,26 +235,29 @@ namespace PachiMoji.EditorTools
                     Expect(sc.ChainLabel.text == "虹だけ", "最後の1枚は外れない：" + sc.ChainLabel.text);
                 }, scrollTo: 0.55f);
 
-                // 買い物：何も買っていない（3つ）・印を消す済み（残り1つ）・両方済み（買ったものと復元だけ）・ストアにつながらない
+                // 買い物の画面：何も買っていない（3つ）・印を消す済み（残り1つ）・両方済み（買ったものと復元だけ）・ストアにつながらない
                 Func<string, string> price = id => id == ProductIds.Set ? "¥500" : "¥300";
-                ShotSettings(720, 1560, Path.Combine(outDir, "settings_shop_none.png"), new EffectSettings(), sc =>
+                ShotShop(720, 1560, Path.Combine(outDir, "shop_none.png"), sc =>
                 {
                     sc.ShowShop(new Entitlements(new string[0]), ShopState.Ready, price);
-                    Expect(sc.ShopItemCount == 3, "何も買っていなければ商品は3つ");
+                    Expect(sc.ItemCount == 3, "何も買っていなければ商品は3つ");
                 });
-                ShotSettings(720, 1560, Path.Combine(outDir, "settings_shop_nomark.png"), new EffectSettings(), sc =>
+                ShotShop(720, 1560, Path.Combine(outDir, "shop_nomark.png"), sc =>
                 {
                     sc.ShowShop(new Entitlements(new[] { ProductIds.NoMark }), ShopState.Ready, price);
-                    sc.ShowShopNotice("ありがとうございます。購入しました");
-                    Expect(sc.ShopItemCount == 1, "片方を買ったら商品は残りの1つ");
+                    sc.ShowNotice("ありがとうございます。購入しました");
+                    Expect(sc.ItemCount == 1, "片方を買ったら商品は残りの1つ");
                 });
-                ShotSettings(720, 1560, Path.Combine(outDir, "settings_shop_both.png"), new EffectSettings(), sc =>
+                ShotShop(720, 1560, Path.Combine(outDir, "shop_both.png"), sc =>
                 {
                     sc.ShowShop(new Entitlements(new[] { ProductIds.Set }), ShopState.Ready, price);
-                    Expect(sc.ShopItemCount == 0, "両方買ったら商品は無し");
+                    Expect(sc.ItemCount == 0, "両方買ったら商品は無し");
                 });
-                ShotSettings(720, 1280, Path.Combine(outDir, "settings_shop_unavailable.png"), new EffectSettings(), sc =>
+                ShotShop(720, 1280, Path.Combine(outDir, "shop_unavailable.png"), sc =>
                     sc.ShowShop(new Entitlements(new string[0]), ShopState.Unavailable, _ => null));
+                // メイン画面の右上：歯車と買い物の投入口（拡大）
+                ShotMain(720, 1560, Path.Combine(outDir, "main_9x19_topright.png"), "定時", "退社", AppState.Idle, ui =>
+                    Expect(ui.ShopButton != null && ui.ShopButton.GetComponent<CanvasGroup>().interactable, "待ちの画面で買い物を押せる"));
 
                 // 広告：追跡の許可（ATT）の部品は iPhone だけ。手元（Editor）では広告を動かさず、ごほうびは見終えた扱い
                 var att = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiTracking.mm") as PluginImporter;
@@ -411,6 +416,22 @@ namespace PachiMoji.EditorTools
             UnityEngine.Object.DestroyImmediate(board);
         }
 
+        static void ShotShop(int w, int h, string path, Action<ShopScreen> check)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            float pt = w / UiTheme.ReferenceSize.x;
+            var safe = new Rect(0, 34 * pt, w, h - (47 + 34) * pt);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = MainScreen.CreateUiCamera();
+            uiCam.targetTexture = rt;
+            var screen = ShopScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h));
+            screen.Show(true);
+            screen.SetSlide(0);
+            check(screen);
+            Canvas.ForceUpdateCanvases();
+            RenderUi(rt, path, uiCam);
+        }
+
         static void ShotSettings(int w, int h, string path, EffectSettings settings, Action<SettingsScreen> check = null, bool bottom = false, float scrollTo = -1)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
@@ -422,6 +443,7 @@ namespace PachiMoji.EditorTools
             var screen = SettingsScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h), settings, _ => { });
             screen.Show(true);
             screen.SetSlide(0);
+            Canvas.ForceUpdateCanvases();   // 画面の大きさを決めてから確かめる（縦に動かせるか、など）
             check?.Invoke(screen);
             Canvas.ForceUpdateCanvases();
             if (scrollTo >= 0) screen.ScrollTo(scrollTo);

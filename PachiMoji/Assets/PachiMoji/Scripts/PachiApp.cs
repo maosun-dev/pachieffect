@@ -9,13 +9,14 @@ namespace PachiMoji
     /// アプリの流れ：言葉を入れて待つ → PUSH で演出 → 終わったら「もう一回」「書き出す」「言葉を変える」。
     /// 書き出すと、画面の舞台を片付けて書き出し用の演出を別に組み立て、終わったら「写真に保存」「共有」。
     /// 広告を消していない人は、書き出しの前にごほうび広告を最後まで見る（ExportGate）。印は買ったもので決まる（Entitlements）。
+    /// 設定と買い物は、待ちの画面の上へ下からせり上がる（右上の歯車と投入口）。
     /// 舞台を組み立て直すのは、入力を確定したときと設定を閉じたときだけ（言葉と設定が前と同じなら作り直さない）。
     /// </summary>
     public class PachiApp : MonoBehaviour
     {
         const string WordsKey1 = "words.1", WordsKey2 = "words.2";
         const float SinkTime = 0.3f;    // 入力の板と PUSH が沈んで消えるまで（秒）
-        const float SlideTime = 0.25f;  // 設定画面がせり上がるまで（秒）
+        const float SlideTime = 0.25f;  // 設定・買い物の画面がせり上がるまで（秒）
 
         EffectSettings settings;
         StageScreen stage;
@@ -27,6 +28,8 @@ namespace PachiMoji
         InputCheck check;
         MainScreen ui;
         SettingsScreen settingsUi;
+        ShopScreen shopUi;
+        ICover cover;   // いま開いている・閉じかけている上の画面
         Camera uiCam;
         AppState state;
         float t, idleT, sink, slide = 1;
@@ -46,6 +49,8 @@ namespace PachiMoji
             ui = MainScreen.Build(root, Screen.safeArea, ScreenPx);
             settingsUi = SettingsScreen.Build(root, Screen.safeArea, ScreenPx, settings, s => s.Save());
             settingsUi.Back.onClick.AddListener(CloseSettings);
+            shopUi = ShopScreen.Build(root, Screen.safeArea, ScreenPx);
+            shopUi.Back.onClick.AddListener(CloseShop);
             stage = new StageScreen(ui, uiCam);
             ui.Line1.text = PlayerPrefs.GetString(WordsKey1, "定時");
             ui.Line2.text = PlayerPrefs.GetString(WordsKey2, "退社");
@@ -58,6 +63,7 @@ namespace PachiMoji
             ui.Again.onClick.AddListener(StartPlay);
             ui.ChangeWords.onClick.AddListener(BackToIdle);
             ui.Gear.onClick.AddListener(OpenSettings);
+            ui.ShopButton.onClick.AddListener(OpenShop);
             ui.Export.onClick.AddListener(OnExportPressed);
             ui.CancelExport.onClick.AddListener(CancelExport);
             ui.SavePhoto.onClick.AddListener(SavePhoto);
@@ -67,9 +73,9 @@ namespace PachiMoji
             // 課金と広告：端末に残っていた買ったもので始める（ネットなしでも効く）
             shop = new Shop(Entitlements.Load());
             shop.Changed += OnShopChanged;
-            shop.Notice += settingsUi.ShowShopNotice;
-            settingsUi.Buy = shop.Buy;
-            settingsUi.Restore.onClick.AddListener(shop.Restore);
+            shop.Notice += shopUi.ShowNotice;
+            shopUi.Buy = shop.Buy;
+            shopUi.Restore.onClick.AddListener(shop.Restore);
             ads = new Ads();
             ads.Changed += RefreshExportGate;
             ads.Start(shop.Owned.ShowAds);
@@ -94,8 +100,8 @@ namespace PachiMoji
             if (slideDir != 0)
             {
                 slide = Mathf.Clamp01(slide + slideDir * dt / SlideTime);
-                settingsUi.SetSlide(Smooth(slide));   // 1＝下に隠れている、0＝全部見えている
-                if (slideDir > 0 && slide >= 1) { slideDir = 0; settingsUi.Show(false); }
+                cover.SetSlide(Smooth(slide));   // 1＝下に隠れている、0＝全部見えている
+                if (slideDir > 0 && slide >= 1) { slideDir = 0; cover.Show(false); }
                 else if (slideDir < 0 && slide <= 0) slideDir = 0;
             }
             ui.Pulse(Time.unscaledTime);
@@ -113,6 +119,7 @@ namespace PachiMoji
             {
                 case AppState.Idle:
                 case AppState.Settings:
+                case AppState.Shop:
                     idleT = Mathf.Repeat(idleT + dt, 1000f);
                     fx.Idle(idleT);
                     break;
@@ -178,10 +185,10 @@ namespace PachiMoji
             ui.EndNotice.text = ExportGate.NoticeFor(gate, ui.EndNotice.text);
         }
 
-        // 買ったものが変わった：設定の買い物を描き直し、広告を消した人はすぐバナーを消す
+        // 買ったものが変わった：買い物の画面を描き直し、広告を消した人はすぐバナーを消す
         void OnShopChanged()
         {
-            settingsUi.ShowShop(shop.Owned, shop.State, shop.PriceOf);
+            shopUi.ShowShop(shop.Owned, shop.State, shop.PriceOf);
             settingsUi.SetBannerSpace(shop.Owned.ShowAds);
             if (!shop.Owned.ShowAds) ads.SetBanner(false);
             RefreshExportGate();
@@ -321,14 +328,34 @@ namespace PachiMoji
 
         void OpenSettings()
         {
-            if (state != AppState.Idle || sinkDir != 0) return;
-            EventSystem.current?.SetSelectedGameObject(null);
-            SetState(AppState.Settings);
-            stage.SetVisible(false);   // 設定画面は全面を覆うので、裏の舞台は描かない
+            if (!OpenCover(settingsUi, AppState.Settings)) return;
             settingsUi.SetWordLength(string.Concat(ui.Line1.text, ui.Line2.text).Replace(" ", "").Replace("　", "").Length);
-            settingsUi.SetSlide(1);   // 下に隠れた位置から（開いた最初のコマで全部見えないように）
-            settingsUi.Show(true);
+        }
+
+        void OpenShop() => OpenCover(shopUi, AppState.Shop);
+
+        void CloseShop()
+        {
+            if (state != AppState.Shop) return;
+            slideDir = 1;
+            SetState(AppState.Idle);
+            Rebuild();   // 言葉も設定も変わっていないので、組み立て直さずに舞台を出し直すだけ
+        }
+
+        // 上の画面をせり上げる。待ちのときだけ（閉じかけの画面があれば、すぐ片付けてから）
+        bool OpenCover(ICover c, AppState s)
+        {
+            if (state != AppState.Idle || sinkDir != 0) return false;
+            if (slideDir == 0 || cover != c) slide = 1;   // 下に隠れた位置から（閉じかけの同じ画面なら、その位置から戻す）
+            if (cover != null && cover != c) cover.Show(false);
+            EventSystem.current?.SetSelectedGameObject(null);
+            SetState(s);
+            stage.SetVisible(false);   // 全面を覆うので、裏の舞台は描かない
+            cover = c;
+            c.SetSlide(Smooth(slide));
+            c.Show(true);
             slideDir = -1;
+            return true;
         }
 
         // 閉じたら、演出に関わる設定が変わっていれば舞台を組み立て直し、書体が変わっていれば入力を確かめ直す（Rebuild が両方する）
