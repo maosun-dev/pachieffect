@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace PachiMoji
 {
     /// <summary>
-    /// 設定画面：火花・プチュンの光の色と大きさ・書体・昇格の範囲・最初の文字色と背景。黒い全面が下からせり上がる。
+    /// 設定画面：火花・プチュンの光の色と大きさ・書体・昇格の色・チラ見せの文字数と色。黒い全面が下からせり上がる。
     /// 項目は縦に動かせる（見出しと「もどる」は動かない）。
     /// 選んでいるものは金の文字と細い金の線。変えたらすぐ onChanged を呼ぶ（保存は PachiApp）。
     /// いちばん下に買い物（印を消す・広告を消す・セット、購入を復元）。値段と買ったものは ShowShop で描き直す。
@@ -19,8 +19,12 @@ namespace PachiMoji
         RectTransform panel; CanvasGroup group;
         EffectSettings settings;
         Action<EffectSettings> onChanged;
-        RectTransform rail; RectTransform[] medals; TMP_Text rangeLabel;
-        ScrollRect scroll; CanvasGroup firstGroup; TMP_Text firstNote;
+        RectTransform rail; Image[] medals;
+        TMP_Text teaseCountLabel, teaseAllLabel; int wordLength;
+        ScrollRect scroll;
+
+        /// <summary>昇格の色の文字（「緑 → 赤 → 虹」）</summary>
+        public TMP_Text ChainLabel { get; private set; }
         RectTransform content, shopBox; float shopTop; TMP_Text shopNotice;
         readonly List<GameObject> shopRows = new List<GameObject>();
 
@@ -35,7 +39,6 @@ namespace PachiMoji
             [ProductIds.NoAds] = ("広告を消す", "広告を消し、ネットなしでも書き出せます"),
             [ProductIds.Set] = ("セット", "印と広告を、どちらも消します"),
         };
-        static readonly string[] TierNames = { "銀", "金", "虹" };
 
         public static SettingsScreen Build(RectTransform canvasRoot, Rect safePx, Vector2 screenPx,
             EffectSettings settings, Action<EffectSettings> onChanged)
@@ -86,8 +89,12 @@ namespace PachiMoji
                 i => settings.Size = (LightSize)i);
             m.Choice(parent, ref y, "書体", new[] { "ポップ", "明朝" }, null, (int)settings.Font, 150,
                 i => settings.Font = (TextFont)i);
-            m.Range(parent, ref y);
-            m.First(parent, ref y);
+            m.ChainSection(parent, ref y);
+            m.TeaseCountSection(parent, ref y);
+            m.Choice(parent, ref y, "チラ見せの文字色", TierNames7(), null, (int)settings.TeaseText, 44,
+                i => settings.TeaseText = (Tier)i, TierTextColors());
+            m.Choice(parent, ref y, "チラ見せの背景", TierNames7(), null, (int)settings.TeaseBack, 44,
+                i => settings.TeaseBack = (Tier)i, TierTextColors());
             m.ShopSection(parent, y);
 
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
@@ -115,9 +122,6 @@ namespace PachiMoji
         /// <summary>中身が見える範囲より長く、縦に動かせるか</summary>
         public bool Scrollable => scroll.content.rect.height > scroll.viewport.rect.height;
 
-        /// <summary>最初の色を選べるか（昇格のはじまりが銀のときだけ）</summary>
-        public bool FirstColorsEnabled => firstGroup.interactable;
-
         public void Show(bool on)
         {
             group.alpha = on ? 1 : 0;
@@ -133,8 +137,9 @@ namespace PachiMoji
         }
 
         // 項目1つ：見出し（灰）と、銀の板の選択肢を横に並べる
+        // textColors を渡すと、字をその色で書き（Color.clear は虹色）、選んでも字の色は変えず金の下線だけで示す
         void Choice(RectTransform parent, ref float y, string label, string[] options, Color[] dots, int selected,
-            float width, Action<int> pick)
+            float width, Action<int> pick, Color[] textColors = null)
         {
             var head = MainScreen.Rect(parent, label);
             MainScreen.Place(head, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 22));
@@ -144,7 +149,7 @@ namespace PachiMoji
 
             var texts = new List<TMP_Text>();
             var lines = new List<Image>();
-            float gap = 8, total = options.Length * width + (options.Length - 1) * gap;
+            float gap = options.Length >= 7 ? 5 : 8, total = options.Length * width + (options.Length - 1) * gap;
             for (int i = 0; i < options.Length; i++)
             {
                 int index = i;
@@ -152,6 +157,16 @@ namespace PachiMoji
                 var b = MainScreen.PlateButton(parent, options[i], new Vector2(0.5f, 1), new Vector2(x, y), new Vector2(width, 48),
                     UiTheme.Display, 18, UiTheme.Chrome);
                 var text = b.GetComponentInChildren<TMP_Text>();
+                if (textColors != null)
+                {
+                    text.color = textColors[i].a > 0 ? textColors[i] : Color.white;
+                    if (textColors[i].a == 0)
+                    {
+                        text.enableVertexGradient = true;   // 虹：左上から右下へ色が回る
+                        text.colorGradient = new VertexGradient(Color.HSVToRGB(0f, 0.7f, 1), Color.HSVToRGB(0.33f, 0.7f, 1),
+                            Color.HSVToRGB(0.6f, 0.7f, 1), Color.HSVToRGB(0.8f, 0.7f, 1));
+                    }
+                }
                 if (dots != null)
                 {
                     // 光の色の見本：文字の左に小さな光の点（虹は色相が回る点）
@@ -171,103 +186,150 @@ namespace PachiMoji
                 b.onClick.AddListener(() =>
                 {
                     pick(index);
-                    Mark(texts, lines, index);
+                    Mark(texts, lines, index, textColors != null);
                     onChanged(settings);
                 });
             }
-            Mark(texts, lines, selected);
+            Mark(texts, lines, selected, textColors != null);
             y -= 52;
         }
 
-        static void Mark(List<TMP_Text> texts, List<Image> lines, int selected)
+        static void Mark(List<TMP_Text> texts, List<Image> lines, int selected, bool keepColors)
         {
             for (int i = 0; i < texts.Count; i++)
             {
-                texts[i].color = i == selected ? UiTheme.Gold : UiTheme.Chrome;
+                if (!keepColors) texts[i].color = i == selected ? UiTheme.Gold : UiTheme.Chrome;
                 lines[i].enabled = i == selected;
             }
         }
 
-        // 昇格の範囲：銀・金・虹のメダルを並べ、指でなぞった端から端までを範囲にする
-        void Range(RectTransform parent, ref float y)
-        {
-            var head = MainScreen.Rect(parent, "RangeHead");
-            MainScreen.Place(head, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 22));
-            MainScreen.Label(head, "昇格の範囲", UiTheme.Body, 13, UiTheme.Muted).alignment = TextAlignmentOptions.Left;
-            y -= 56;
+        const float MedalSize = 40, MedalGap = 47;   // 7枚が1列に収まる大きさ
 
+        // 見出し（灰）
+        static void Head(RectTransform parent, float y, string text)
+        {
+            var head = MainScreen.Rect(parent, text);
+            MainScreen.Place(head, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 22));
+            MainScreen.Label(head, text, UiTheme.Body, 13, UiTheme.Muted).alignment = TextAlignmentOptions.Left;
+        }
+
+        // 昇格の色：7枚のメダルを格の順に並べ、押すと入る・外れる（最後の1枚は外れない）
+        void ChainSection(RectTransform parent, ref float y)
+        {
+            Head(parent, y, "昇格の色");
+            y -= 44;
             var row = MainScreen.Rect(parent, "Medals");
-            MainScreen.Place(row, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(320, 84));
-            row.gameObject.AddComponent<Image>().color = Color.clear;   // なぞれる範囲
+            MainScreen.Place(row, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 48));
             rail = MainScreen.Rect(row, "Rail");
             var ri = rail.gameObject.AddComponent<Image>();
             ri.sprite = UiArt.Rail(); ri.type = Image.Type.Sliced; ri.raycastTarget = false;
-            medals = new RectTransform[3];
-            for (int i = 0; i < 3; i++)
+            medals = new Image[7];
+            for (int i = 0; i < 7; i++)
             {
-                medals[i] = MainScreen.Rect(row, "Medal" + i);
-                MainScreen.Place(medals[i], new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 110, 0), new Vector2(72, 72));
-                var mi = medals[i].gameObject.AddComponent<Image>();
-                mi.sprite = UiArt.Medal(RangePicker.Medals[i]); mi.raycastTarget = false;
+                var tier = (Tier)i;
+                var rt = MainScreen.Rect(row, "Medal" + i);
+                MainScreen.Place(rt, new Vector2(0.5f, 0.5f), new Vector2((i - 3) * MedalGap, 0), new Vector2(MedalSize, MedalSize));
+                medals[i] = rt.gameObject.AddComponent<Image>();
+                medals[i].sprite = UiArt.Medal(tier);
+                var b = rt.gameObject.AddComponent<Button>();
+                b.transition = Selectable.Transition.None;
+                rt.gameObject.AddComponent<PressSink>();
+                b.onClick.AddListener(() => PressMedal(tier));
             }
-            var drag = row.gameObject.AddComponent<MedalDrag>();
-            drag.IndexAt = local => Mathf.Clamp(Mathf.RoundToInt(local.x / 110f) + 1, 0, 2);
-            drag.Preview = (a, b) => ShowRange(RangePicker.FromDrag(a, b));
-            drag.Commit = (a, b) =>
-            {
-                (settings.From, settings.To) = RangePicker.FromDrag(a, b);
-                ShowRange((settings.From, settings.To));
-                ShowFirstEnabled();
-                onChanged(settings);
-            };
-            y -= 60;
-
-            var label = MainScreen.Rect(parent, "RangeLabel");
+            y -= 40;
+            var label = MainScreen.Rect(parent, "ChainLabel");
             MainScreen.Place(label, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 30));
-            rangeLabel = MainScreen.Label(label, "", UiTheme.Display, 20, UiTheme.Chrome);
-            y -= 30;
-            var help = MainScreen.Rect(parent, "RangeHelp");
+            ChainLabel = MainScreen.Label(label, "", UiTheme.Display, 20, UiTheme.Chrome);
+            y -= 28;
+            var help = MainScreen.Rect(parent, "ChainHelp");
             MainScreen.Place(help, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 24));
-            MainScreen.Label(help, "メダルを指でなぞって、はじまりとおわりの色を選びます", UiTheme.Body, 12, UiTheme.Muted);
-            ShowRange((settings.From, settings.To));
-            y -= 48;
+            MainScreen.Label(help, "メダルを押して、通る色を選びます。最初の色でドンと着地します", UiTheme.Body, 11, UiTheme.Muted);
+            y -= 44;
+            ShowChain();
         }
 
-        // 最初の文字色と背景：銀の段（ドンで着地してから金に変わるまで）の色。はじまりが銀のときだけ選べる
-        void First(RectTransform parent, ref float y)
+        /// <summary>メダルを押したとき（手元確認からも呼ぶ）</summary>
+        public void PressMedal(Tier t)
         {
-            var box = MainScreen.Rect(parent, "First");
-            box.anchorMin = new Vector2(0, 1); box.anchorMax = new Vector2(1, 1);
-            box.pivot = new Vector2(0.5f, 1);
-            box.anchoredPosition = new Vector2(0, y);
-            firstGroup = box.gameObject.AddComponent<CanvasGroup>();
-            float by = 0;
-            Choice(box, ref by, "最初の文字色", new[] { "銀", "青", "緑", "赤", "紫" },
-                new[] { UiTheme.Chrome, Hex(FirstColors.TextBase(FirstText.Blue)), Hex(FirstColors.TextBase(FirstText.Green)),
-                        Hex(FirstColors.TextBase(FirstText.Red)), Hex(FirstColors.TextBase(FirstText.Purple)) },
-                (int)settings.FirstText, 62, i => settings.FirstText = (FirstText)i);
-            Choice(box, ref by, "最初の背景", new[] { "青", "緑", "赤", "紫" },
-                new[] { Hex(FirstColors.TextBase(FirstText.Blue)), Hex(FirstColors.TextBase(FirstText.Green)),
-                        Hex(FirstColors.TextBase(FirstText.Red)), Hex(FirstColors.TextBase(FirstText.Purple)) },
-                (int)settings.FirstBack, 80, i => settings.FirstBack = (FirstBack)i);
-            box.sizeDelta = new Vector2(0, -by);
-            y += by;
-
-            var note = MainScreen.Rect(parent, "FirstNote");
-            MainScreen.Place(note, new Vector2(0.5f, 1), new Vector2(0, y + 8), new Vector2(340, 24));
-            firstNote = MainScreen.Label(note, "", UiTheme.Body, 12, UiTheme.Muted);
-            y -= 24;
-            ShowFirstEnabled();
+            settings.Chain = Chain.Toggle(settings.Chain, t);
+            ShowChain();
+            onChanged(settings);
         }
 
-        // はじまりが銀でないときは、最初の色を薄くして押せなくし、わけを出す
-        void ShowFirstEnabled()
+        // 点いたメダルは明るく、消えたメダルは暗く。点いた最初から最後まで金の帯を後ろに通す
+        void ShowChain()
         {
-            bool on = settings.FirstColorsApply;
-            firstGroup.alpha = on ? 1 : 0.3f;
-            firstGroup.interactable = firstGroup.blocksRaycasts = on;
-            firstNote.text = on ? "ドンと着地してから、金に変わるまでの色です" : "昇格のはじまりが銀のときに効きます";
+            var chain = settings.Chain;
+            int first = (int)chain[0], last = (int)chain[chain.Length - 1];
+            float x0 = (first - 3) * MedalGap, x1 = (last - 3) * MedalGap;
+            MainScreen.Place(rail, new Vector2(0.5f, 0.5f), new Vector2((x0 + x1) / 2, 0), new Vector2(x1 - x0 + 16, 14));
+            rail.gameObject.SetActive(first != last);
+            for (int i = 0; i < 7; i++)
+                medals[i].color = System.Array.IndexOf(chain, (Tier)i) >= 0 ? Color.white : new Color(0.45f, 0.45f, 0.45f, 1);   // 消えたメダルも何色か分かる明るさ
+            ChainLabel.text = Chain.Label(chain);
         }
+
+        // チラ見せの文字数：左右の矢印で 0（なし）〜12。言葉の文字数以上なら「（全部）」
+        void TeaseCountSection(RectTransform parent, ref float y)
+        {
+            Head(parent, y, "チラ見せの文字数");
+            y -= 40;
+            var minus = ArrowButton(parent, false, new Vector2(-96, y));
+            var plus = ArrowButton(parent, true, new Vector2(96, y));
+            minus.onClick.AddListener(() => StepTease(-1));
+            plus.onClick.AddListener(() => StepTease(1));
+            var num = MainScreen.Rect(parent, "TeaseCount");
+            MainScreen.Place(num, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(120, 48));
+            teaseCountLabel = MainScreen.Label(num, "", UiTheme.Display, 26, UiTheme.Chrome);
+            y -= 32;
+            var all = MainScreen.Rect(parent, "TeaseAll");
+            MainScreen.Place(all, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(200, 20));
+            teaseAllLabel = MainScreen.Label(all, "", UiTheme.Body, 12, UiTheme.Muted);
+            y -= 36;
+            ShowTeaseCount();
+        }
+
+        // 矢印の銀の板（矢印はコードで描いた三角）
+        Button ArrowButton(RectTransform parent, bool right, Vector2 pos)
+        {
+            var b = MainScreen.PlateButton(parent, right ? "Next" : "Prev", new Vector2(0.5f, 1), pos, new Vector2(64, 48), UiTheme.Display, 1, Color.clear);
+            var icon = MainScreen.Rect(b.transform, "Arrow");
+            MainScreen.Place(icon, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(18, 18));
+            var img = icon.gameObject.AddComponent<Image>();
+            img.sprite = UiArt.Arrow(right);
+            img.raycastTarget = false;
+            return b;
+        }
+
+        void StepTease(int d)
+        {
+            settings.TeaseCount = Mathf.Clamp(settings.TeaseCount + d, 0, TeasePlan.MaxChars);
+            ShowTeaseCount();
+            onChanged(settings);
+        }
+
+        void ShowTeaseCount()
+        {
+            int n = settings.TeaseCount;
+            teaseCountLabel.text = n == 0 ? "なし" : n.ToString();
+            teaseAllLabel.text = n > 0 && wordLength > 0 && n >= wordLength ? "（全部）" : "";
+        }
+
+        /// <summary>今の言葉の文字数（設定を開く前に PachiApp が渡す。「（全部）」に使う）</summary>
+        public void SetWordLength(int n)
+        {
+            wordLength = n;
+            ShowTeaseCount();
+        }
+
+        // 色の字の見本：銀は銀、金は金、虹は虹色（Color.clear で虹の印）
+        static Color[] TierTextColors() => new[]
+        {
+            UiTheme.Chrome, Hex(TierColors.TextBase(Tier.Blue)), Hex(TierColors.TextBase(Tier.Green)), Hex(TierColors.TextBase(Tier.Purple)),
+            Hex(TierColors.TextBase(Tier.Red)), UiTheme.Gold, Color.clear,
+        };
+
+        static string[] TierNames7() => System.Array.ConvertAll((Tier[])System.Enum.GetValues(typeof(Tier)), TierColors.Name);
 
         // 買い物：見出し・商品の板（作り直す）・買ったもの・購入を復元・知らせ
         void ShopSection(RectTransform parent, float y)
@@ -367,44 +429,6 @@ namespace PachiMoji
         {
             ColorUtility.TryParseHtmlString(hex, out var c);
             return c;
-        }
-
-        // 金の帯を、はじまりのメダルからおわりのメダルまで伸ばし、メダルの明るさで範囲を見せる
-        void ShowRange((Tier from, Tier to) r)
-        {
-            int from = System.Array.IndexOf(RangePicker.Medals, r.from), to = System.Array.IndexOf(RangePicker.Medals, r.to);
-            float x0 = (from - 1) * 110, x1 = (to - 1) * 110;
-            MainScreen.Place(rail, new Vector2(0.5f, 0.5f), new Vector2((x0 + x1) / 2, 0), new Vector2(x1 - x0 + 40, 22));
-            for (int i = 0; i < 3; i++)
-            {
-                bool inside = i >= from && i <= to;
-                medals[i].GetComponent<Image>().color = inside ? Color.white : new Color(0.35f, 0.35f, 0.35f, 1);
-            }
-            rangeLabel.text = r.from == r.to ? TierNames[from] + "だけ" : TierNames[from] + " → " + TierNames[to];
-        }
-    }
-
-    /// <summary>メダルの列をなぞる：指を置いたメダルから、いま指があるメダルまで</summary>
-    public class MedalDrag : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
-    {
-        public Func<Vector2, int> IndexAt;
-        public Action<int, int> Preview, Commit;
-        int down = -1;
-
-        int At(PointerEventData e)
-        {
-            RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)transform, e.position, e.pressEventCamera, out var local);
-            return IndexAt(local);
-        }
-
-        public void OnPointerDown(PointerEventData e) { down = At(e); Preview?.Invoke(down, down); }
-        public void OnDrag(PointerEventData e) { if (down >= 0) Preview?.Invoke(down, At(e)); }
-
-        public void OnPointerUp(PointerEventData e)
-        {
-            if (down < 0) return;
-            Commit?.Invoke(down, At(e));
-            down = -1;
         }
     }
 }

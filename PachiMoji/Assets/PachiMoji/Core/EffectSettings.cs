@@ -34,6 +34,9 @@ namespace PachiMoji
     /// <summary>演出の好み。端末（PlayerPrefs）に残し、再生にも書き出しにも同じように効く</summary>
     public class EffectSettings
     {
+        // 前の版の「はじまり・おわり」の保存の数（0=銀・1=金・2=虹）
+        static readonly Tier[] OldMedals = { Tier.Silver, Tier.Gold, Tier.Rainbow };
+
         public bool SparksOn = true;
         public LightColor Light = LightColor.IceBlue;
         public LightSize Size = LightSize.Medium;
@@ -72,8 +75,8 @@ namespace PachiMoji
                 Light = (LightColor)Pick(prefix + "light", (int)d.Light, 3),
                 Size = (LightSize)Pick(prefix + "size", (int)d.Size, 2),
                 Font = (TextFont)Pick(prefix + "font", (int)d.Font, 1),
-                From = RangePicker.Medals[Pick(prefix + "from", 0, 2)],   // 保存は 0=銀・1=金・2=虹
-                To = RangePicker.Medals[Pick(prefix + "to", 2, 2)],
+                From = OldMedals[Pick(prefix + "from", 0, 2)],   // 保存は 0=銀・1=金・2=虹
+                To = OldMedals[Pick(prefix + "to", 2, 2)],
                 FirstText = (FirstText)Pick(prefix + "firstText", (int)d.FirstText, 4),
                 FirstBack = (FirstBack)Pick(prefix + "firstBack", (int)d.FirstBack, 3),
             };
@@ -91,8 +94,8 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "light", (int)Light);
             PlayerPrefs.SetInt(prefix + "size", (int)Size);
             PlayerPrefs.SetInt(prefix + "font", (int)Font);
-            PlayerPrefs.SetInt(prefix + "from", System.Array.IndexOf(RangePicker.Medals, From));
-            PlayerPrefs.SetInt(prefix + "to", System.Array.IndexOf(RangePicker.Medals, To));
+            PlayerPrefs.SetInt(prefix + "from", System.Array.IndexOf(OldMedals, From));
+            PlayerPrefs.SetInt(prefix + "to", System.Array.IndexOf(OldMedals, To));
             PlayerPrefs.SetInt(prefix + "chain", PachiMoji.Chain.ToMask(Chain));
             PlayerPrefs.SetInt(prefix + "teaseCount", TeaseCount);
             PlayerPrefs.SetInt(prefix + "teaseText", (int)TeaseText);
@@ -116,7 +119,7 @@ namespace PachiMoji
             if (!PlayerPrefs.HasKey(prefix + "from") && !PlayerPrefs.HasKey(prefix + "to")) return (Tier[])PachiMoji.Chain.Default.Clone();
             int a = Pick(prefix + "from", 0, 2), b = Pick(prefix + "to", 2, 2);
             var list = new System.Collections.Generic.List<Tier>();
-            for (int i = Mathf.Min(a, b); i <= Mathf.Max(a, b); i++) list.Add(RangePicker.Medals[i]);
+            for (int i = Mathf.Min(a, b); i <= Mathf.Max(a, b); i++) list.Add(OldMedals[i]);
             return list.ToArray();
         }
 

@@ -202,12 +202,24 @@ namespace PachiMoji.EditorTools
                 // 設定画面：既定と、全部を変えたとき
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_default.png"), new EffectSettings());
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_changed.png"), new EffectSettings
-                    { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho, From = Tier.Gold, To = Tier.Rainbow });
-                // いちばん下まで動かした姿（最初の色）：はじまりが銀なら選べる、金なら薄くて押せない（iPhone SE の 9:16 でも）
-                ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_silver.png"), new EffectSettings { FirstText = FirstText.Red, FirstBack = FirstBack.Purple },
-                    sc => { Expect(sc.FirstColorsEnabled, "はじまりが銀なら最初の色を選べる"); Expect(sc.Scrollable, "設定画面を縦に動かせる"); });
-                ShotSettings(720, 1280, Path.Combine(outDir, "settings_bottom_gold.png"), new EffectSettings { From = Tier.Gold },
-                    sc => Expect(!sc.FirstColorsEnabled, "はじまりが金なら最初の色は押せない"), bottom: true);
+                    { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho });
+                // 昇格の色・チラ見せ（iPhone SE の 9:16 で、まん中あたりまで動かした姿）
+                var chainSettings = new EffectSettings { Chain = new[] { Tier.Green, Tier.Red, Tier.Rainbow }, TeaseCount = 3, TeaseText = Tier.Gold, TeaseBack = Tier.Purple };
+                ShotSettings(720, 1280, Path.Combine(outDir, "settings_chain.png"), chainSettings, sc =>
+                {
+                    sc.SetWordLength(6);
+                    Expect(sc.ChainLabel.text == "緑 → 赤 → 虹", "昇格の色の文字：" + sc.ChainLabel.text);
+                    Expect(sc.Scrollable, "設定画面を縦に動かせる");
+                }, scrollTo: 0.55f);
+                ShotSettings(720, 1280, Path.Combine(outDir, "settings_chain_pressed.png"), new EffectSettings(), sc =>
+                {
+                    sc.SetWordLength(2);   // 文字数 12 は言葉（2文字）より多いので「（全部）」
+                    sc.PressMedal(Tier.Blue);
+                    sc.PressMedal(Tier.Gold);
+                    Expect(sc.ChainLabel.text == "銀 → 青 → 虹", "メダルを押すと入る・外れる：" + sc.ChainLabel.text);
+                    sc.PressMedal(Tier.Silver); sc.PressMedal(Tier.Blue); sc.PressMedal(Tier.Rainbow);
+                    Expect(sc.ChainLabel.text == "虹だけ", "最後の1枚は外れない：" + sc.ChainLabel.text);
+                }, scrollTo: 0.55f);
 
                 // 買い物：何も買っていない（3つ）・印を消す済み（残り1つ）・両方済み（買ったものと復元だけ）・ストアにつながらない
                 Func<string, string> price = id => id == ProductIds.Set ? "¥500" : "¥300";
@@ -387,7 +399,7 @@ namespace PachiMoji.EditorTools
             UnityEngine.Object.DestroyImmediate(board);
         }
 
-        static void ShotSettings(int w, int h, string path, EffectSettings settings, Action<SettingsScreen> check = null, bool bottom = false)
+        static void ShotSettings(int w, int h, string path, EffectSettings settings, Action<SettingsScreen> check = null, bool bottom = false, float scrollTo = -1)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             float pt = w / UiTheme.ReferenceSize.x;
@@ -400,7 +412,8 @@ namespace PachiMoji.EditorTools
             screen.SetSlide(0);
             check?.Invoke(screen);
             Canvas.ForceUpdateCanvases();
-            if (check != null || bottom) screen.ScrollTo(0);   // いちばん下
+            if (scrollTo >= 0) screen.ScrollTo(scrollTo);
+            else if (check != null || bottom) screen.ScrollTo(0);   // いちばん下
             RenderUi(rt, path, uiCam);
         }
 

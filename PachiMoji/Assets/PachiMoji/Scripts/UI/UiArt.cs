@@ -100,7 +100,7 @@ namespace PachiMoji
             return ToSprite(px, N, N, Vector4.zero);
         });
 
-        /// <summary>昇格の範囲のメダル：銀・金・虹</summary>
+        /// <summary>昇格の色のメダル：銀・青・緑・紫・赤・金・虹（青〜赤は銀の金属の明るさに色を乗せる）</summary>
         public static Sprite Medal(Tier t) => Cached("medal" + t, () =>
         {
             const int N = 192;
@@ -114,7 +114,8 @@ namespace PachiMoji
                     {
                         Tier.Gold => Color.Lerp(UiTheme.Hex(0xFFE9A8), UiTheme.Hex(0xB07A12), Mathf.Clamp01(r * 0.9f - ny * 0.35f + 0.1f)),
                         Tier.Rainbow => Color.HSVToRGB(Mathf.Repeat(a / (2 * Mathf.PI) + 0.25f, 1f), 0.55f, 1f) * (1.05f - 0.35f * r),
-                        _ => Color.Lerp(UiTheme.Hex(0xF4F6F8), UiTheme.Hex(0x7D838C), Mathf.Clamp01(r * 0.9f - ny * 0.35f + 0.1f)),
+                        Tier.Silver => Color.Lerp(UiTheme.Hex(0xF4F6F8), UiTheme.Hex(0x7D838C), Mathf.Clamp01(r * 0.9f - ny * 0.35f + 0.1f)),
+                        _ => TintedMetal(t, Mathf.Clamp01(r * 0.9f - ny * 0.35f + 0.1f)),
                     };
                     Color c;
                     if (r > 0.88f) c = face * (0.55f + 0.3f * ny);                       // 外のフチ
@@ -125,6 +126,34 @@ namespace PachiMoji
                     float h = Mathf.Clamp01(1 - (hx * hx + hy * hy));
                     c = Color.Lerp(c, Color.white, h * 0.5f);
                     c.a = Mathf.Clamp01((1 - r) * N * 0.5f);
+                    px[y * N + x] = c;
+                }
+            return ToSprite(px, N, N, Vector4.zero);
+        });
+
+        // 青〜赤の金属の面：明るいところは色の芯を白へ寄せ、暗いところは色の芯を沈める（k＝0 明るい → 1 暗い）
+        static Color TintedMetal(Tier t, float k)
+        {
+            ColorUtility.TryParseHtmlString(TierColors.TextBase(t), out var core);
+            var light = Color.Lerp(core, Color.white, 0.55f);
+            var dark = core * 0.45f; dark.a = 1;
+            return Color.Lerp(light, dark, k);
+        }
+
+        /// <summary>チラ見せの文字数の矢印：銀の三角（right で右向き）</summary>
+        public static Sprite Arrow(bool right) => Cached("arrow" + right, () =>
+        {
+            const int N = 64;
+            var px = new Color[N * N];
+            for (int y = 0; y < N; y++)
+                for (int x = 0; x < N; x++)
+                {
+                    float u = (x + 0.5f) / N, v = (y + 0.5f) / N;
+                    if (!right) u = 1 - u;
+                    // 右向きの三角：左の辺 u=0.18、上下の辺は先端（0.85, 0.5）へ
+                    float edge = Mathf.Min(u - 0.18f, Mathf.Min(0.5f - Mathf.Abs(v - 0.5f) - (u - 0.18f) * 0.6f, 0.85f - u)) * N;
+                    Color c = Color.Lerp(UiTheme.Hex(0x8A8F98), UiTheme.Hex(0xF4F6F8), v);
+                    c.a = Mathf.Clamp01(edge + 0.5f);
                     px[y * N + x] = c;
                 }
             return ToSprite(px, N, N, Vector4.zero);

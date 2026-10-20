@@ -36,16 +36,4 @@ namespace PachiMoji
             return m * p;
         }
     }
-
-    /// <summary>昇格の範囲のメダル（0=銀, 1=金, 2=虹）を指でなぞったときの範囲</summary>
-    public static class RangePicker
-    {
-        public static readonly Tier[] Medals = { Tier.Silver, Tier.Gold, Tier.Rainbow };   // 3枚のメダルの色
-
-        public static (Tier from, Tier to) FromDrag(int downIndex, int upIndex)
-        {
-            int a = Mathf.Clamp(downIndex, 0, 2), b = Mathf.Clamp(upIndex, 0, 2);
-            return (Medals[Mathf.Min(a, b)], Medals[Mathf.Max(a, b)]);
-        }
-    }
 }

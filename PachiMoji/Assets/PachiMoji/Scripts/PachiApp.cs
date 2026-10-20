@@ -281,8 +281,8 @@ namespace PachiMoji
                 stage.SetVisible(false);   // 前の言葉を出したままにしない
                 return;
             }
-            string key = string.Join("\n", check.Lines) + "|" + settings.FontName + settings.From + settings.To
-                         + settings.SparksOn + settings.Light + settings.Size + settings.FirstText + settings.FirstBack;
+            string key = string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
+                         + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size;
             if (stage.Effect == null || key != builtKey)
             {
                 stage.Build(check.Lines, settings, ScreenPx);
@@ -325,6 +325,7 @@ namespace PachiMoji
             EventSystem.current?.SetSelectedGameObject(null);
             SetState(AppState.Settings);
             stage.SetVisible(false);   // 設定画面は全面を覆うので、裏の舞台は描かない
+            settingsUi.SetWordLength(string.Concat(ui.Line1.text, ui.Line2.text).Replace(" ", "").Replace("　", "").Length);
             settingsUi.SetSlide(1);   // 下に隠れた位置から（開いた最初のコマで全部見えないように）
             settingsUi.Show(true);
             slideDir = -1;

@@ -54,14 +54,5 @@ namespace PachiMoji.Tests
             var q = Matrix4x4.Perspective(32, 0.5f, 0.05f, 100);
             for (int i = 0; i < 16; i++) Assert.AreEqual(q[i], p[i], 1e-5f);
         }
-
-        [Test]
-        public void なぞった向きに関係なく小さい方がはじまり()
-        {
-            Assert.AreEqual((Tier.Silver, Tier.Rainbow), RangePicker.FromDrag(2, 0));
-            Assert.AreEqual((Tier.Gold, Tier.Gold), RangePicker.FromDrag(1, 1));
-            Assert.AreEqual((Tier.Gold, Tier.Rainbow), RangePicker.FromDrag(1, 5));
-            Assert.AreEqual((Tier.Silver, Tier.Gold), RangePicker.FromDrag(-3, 1));
-        }
     }
 }
