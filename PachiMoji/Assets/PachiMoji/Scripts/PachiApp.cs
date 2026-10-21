@@ -105,6 +105,7 @@ namespace PachiMoji
                 else if (slideDir < 0 && slide <= 0) slideDir = 0;
             }
             ui.Pulse(Time.unscaledTime);
+            if (!AdIds.Production) ui.AdDiag.text = "広告：" + ads.Diag + "／" + ads.Rewarded;   // テスト用の版だけ
             if (state == AppState.Exporting) StepExport();
             // 終わりの画面では、機内モードの切り替えなどに合わせて「書き出す」を押せるかを1秒ごとに決め直す
             if (state == AppState.Finished && (gateCheckT -= dt) <= 0)

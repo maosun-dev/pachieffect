@@ -19,7 +19,8 @@ namespace PachiMoji
         public TMP_Text Notice;
         public RawImage ExportView;                          // 書き出している板（9:16）を範囲に収めて見せる
         public Button CancelExport, SavePhoto, Share, CloseExport;
-        public TMP_Text EndNotice;                           // 終わり・できたの画面の知らせ（失敗の直し方・保存しました）
+        public TMP_Text EndNotice;
+        public TMP_Text AdDiag;                              // テスト用の版だけ：広告の段階（いちばん上に小さく）                           // 終わり・できたの画面の知らせ（失敗の直し方・保存しました）
         public RectTransform StageIdleArea, StagePlayArea;   // 舞台の絵を置く範囲（待ち・再生）
         public RawImage StageView;                           // 舞台の絵を貼る板（StageScreen が使う）
         RectTransform deck; CanvasGroup deckGroup, endGroup, gearGroup, shopGroup, changeGroup;
@@ -151,6 +152,11 @@ namespace PachiMoji
             m.Export = PlateButton(end, "書き出す", bottom, new Vector2(88, 72), new Vector2(164, 60), UiTheme.Display, 22, UiTheme.Chrome);
 
             BuildExport(m, safe, end);
+
+            var diag = Rect(safe, "AdDiag");
+            Place(diag, new Vector2(0.5f, 1), new Vector2(0, -6), new Vector2(380, 12));
+            m.AdDiag = Label(diag, "", UiTheme.Body, 9, UiTheme.Muted);
+            m.AdDiag.enableAutoSizing = true; m.AdDiag.fontSizeMin = 6; m.AdDiag.fontSizeMax = 9;
 
             SetLayer(root.gameObject, UiLayer);
             m.ShowState(AppState.Idle);

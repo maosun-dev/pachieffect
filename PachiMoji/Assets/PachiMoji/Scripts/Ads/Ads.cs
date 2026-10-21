@@ -23,6 +23,13 @@ namespace PachiMoji
         bool started, bannerWanted, rewardedWanted;
 
         public AdState Rewarded { get; private set; }
+
+        /// <summary>いまどの段階か（テスト用の版で画面に出して、iPhone の中で止まっている場所を見る）</summary>
+        public string Stage { get; private set; } = "未開始";
+        string lastError = "";
+        public string Diag => Stage + (lastError != "" ? "／" + lastError : "");
+        void Step(string s) => Stage = s;
+        void Fail(string s) => lastError = s;
         public event Action Changed;   // ごほうび広告の読み込み具合が変わった
 
         static bool OnDevice => Application.platform == RuntimePlatform.IPhonePlayer;
@@ -38,12 +45,15 @@ namespace PachiMoji
             bannerWanted = rewardedWanted = showAds;
             if (!OnDevice) return;
             MobileAds.RaiseAdEventsOnUnityMainThread = true;   // 広告の返事を Unity の流れの中で受ける
+            Step("1 同意の確認中");
             ConsentInformation.Update(new ConsentRequestParameters(), updateError =>
             {
-                if (updateError != null) Debug.LogWarning("[Ads] 同意の確認 " + updateError.Message);
+                if (updateError != null) { Debug.LogWarning("[Ads] 同意の確認 " + updateError.Message); Fail("同意:" + updateError.Message); }
+                Step("2 同意の画面");
                 ConsentForm.LoadAndShowConsentFormIfRequired(formError =>
                 {
-                    if (formError != null) Debug.LogWarning("[Ads] 同意の画面 " + formError.Message);
+                    if (formError != null) { Debug.LogWarning("[Ads] 同意の画面 " + formError.Message); Fail("同意画面:" + formError.Message); }
+                    Step("3 追跡の許可の返事待ち");
                     PachiTrackingBridge.Get(this);
                     PachiTracking_Request();   // 返事は OnTrackingDone
                 });
@@ -53,9 +63,11 @@ namespace PachiMoji
         internal void OnTrackingDone()
         {
             if (started) return;
+            Step("4 広告の部品を始める");
             MobileAds.Initialize(_ =>
             {
                 started = true;
+                Step("5 始まった");
                 if (bannerWanted) LoadBanner();
                 if (rewardedWanted) LoadRewarded();
             });
@@ -77,7 +89,8 @@ namespace PachiMoji
         void LoadBanner()
         {
             banner = new BannerView(AdIds.Banner, AdSize.Banner, AdPosition.Bottom);   // 320×50。下の 62 の場所に収まる
-            banner.OnBannerAdLoadFailed += e => Debug.LogWarning("[Ads] バナーを読めない " + e.GetMessage());
+            banner.OnBannerAdLoadFailed += e => { Debug.LogWarning("[Ads] バナーを読めない " + e.GetMessage()); Fail("バナー:" + e.GetMessage()); };
+            banner.OnBannerAdLoaded += () => Step(Stage + "・バナーOK");
             banner.LoadAd(new AdRequest());
         }
 
@@ -89,6 +102,7 @@ namespace PachiMoji
                 if (error != null || ad == null)
                 {
                     Debug.LogWarning("[Ads] ごほうび広告を読めない " + error?.GetMessage());
+                    Fail("ごほうび:" + error?.GetMessage());
                     SetRewarded(AdState.Failed);
                     PachiTrackingBridge.Get(this).StartCoroutine(Retry());
                     return;
