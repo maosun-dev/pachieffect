@@ -1,5 +1,5 @@
 #!/bin/sh
-# App Store の画面写真（1290×2796）を captures/store/ に撮る
+# App Store の画面写真（1206×2622）を captures/store/ に撮る
 ROOT="C:/Users/USER/Desktop/game/pachieffect"
 mkdir -p "$ROOT/captures/store"
 rm -f "$ROOT/captures/unity-store.log"

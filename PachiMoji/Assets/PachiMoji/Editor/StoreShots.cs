@@ -6,12 +6,12 @@ using UnityEngine;
 namespace PachiMoji.EditorTools
 {
     /// <summary>
-    /// App Store の画面写真（6.9インチ用 1290×2796）を pachieffect/captures/store/ に撮る。
+    /// App Store の画面写真（Dynamic Island 搭載 iPhone 用 1206×2622）を pachieffect/captures/store/ に撮る。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiAppCheck.RunStoreShots で動かす（store-shots.sh）
     /// </summary>
     public static partial class PachiAppCheck
     {
-        const int StoreW = 1290, StoreH = 2796;
+        const int StoreW = 1206, StoreH = 2622;
 
         public static void RunStoreShots()
         {
