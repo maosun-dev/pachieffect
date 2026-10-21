@@ -58,6 +58,10 @@ jobs:
           key: Library-iOS-${{ hashFiles('PachiMoji/Assets/**', 'PachiMoji/Packages/**', 'PachiMoji/ProjectSettings/**') }}
           restore-keys: Library-iOS-
 
+      # 強制終了（Killed）の手がかり：始める前のメモリとスワップ
+      - name: メモリとスワップを記録する
+        run: free -m; swapon --show
+
       - name: Unity で Xcode の作りを作る
         uses: game-ci/unity-builder@v4
         env:
@@ -71,6 +75,13 @@ jobs:
           versioning: None
           # ストアに出す版だけ本物の広告（PachiBuild が PACHI_PRODUCTION を付け、AdMob の本物のアプリ ID を入れる）
           customParameters: ${{ inputs.production && '-pachiProduction' || '' }}
+
+      # 失敗したら、OS がメモリ不足で止めた記録を残す
+      - name: 強制終了の記録を見る
+        if: failure()
+        run: |
+          free -m; swapon --show
+          sudo dmesg -T | grep -iE "oom|killed process|out of memory|memory cgroup" | tail -30 || true
 
       # そのまま渡すと実行の許可（シェルの印）が消えて Xcode の手順が動かないので、固めて渡す
       - name: Xcode の作りを固める
