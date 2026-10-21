@@ -2,11 +2,15 @@ using UnityEngine;
 
 namespace PachiMoji
 {
-    /// <summary>PachiTracking.mm が UnitySendMessage で返事を届ける受け口。読み直しの待ちにも使う（名前で探されるので変えない）</summary>
+    /// <summary>
+    /// PachiTracking.mm が UnitySendMessage で返事を届ける受け口。読み直しの待ちと、
+    /// 広告の部品の返事を Unity の流れで動かす待ち行列（Queue）の取り出しにも使う（名前で探されるので変えない）
+    /// </summary>
     public class PachiTrackingBridge : MonoBehaviour
     {
         public const string Name = "PachiTrackingBridge";
         Ads ads;
+        public readonly MainThreadQueue Queue = new MainThreadQueue();
 
         public static PachiTrackingBridge Get(Ads ads)
         {
@@ -23,5 +27,7 @@ namespace PachiMoji
         }
 
         void OnTracking(string _) => ads?.OnTrackingDone();
+
+        void Update() => Queue.Drain();
     }
 }

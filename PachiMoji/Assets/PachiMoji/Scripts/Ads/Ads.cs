@@ -10,6 +10,8 @@ namespace PachiMoji
     /// <summary>
     /// 広告（Google Mobile Ads）の包み：同意（ヨーロッパの人だけ画面が出る）→ 追跡の許可（ATT）→ 始める →
     /// 下のバナーと、書き出し前のごほうび広告。
+    /// 広告の部品の返事はすべて OnMain で Unity の流れに移してから扱う（部品の「返事を Unity の流れで受ける」設定は、
+    /// 始める前の同意の確認の返事を止めてしまう。2026-10-21 に TestFlight で広告が出なかった原因）
     /// iPhone 以外（Editor・Windows）では何もせず、ごほうびは見終えた扱いにする（手元確認で広告を動かさない）
     /// </summary>
     public class Ads
@@ -18,6 +20,7 @@ namespace PachiMoji
 
         const float RetrySeconds = 30;   // ごほうび広告が読めなかったときに読み直すまで
 
+        PachiTrackingBridge bridge;
         BannerView banner;
         RewardedAd rewarded;
         bool started, bannerWanted, rewardedWanted;
@@ -44,33 +47,35 @@ namespace PachiMoji
         {
             bannerWanted = rewardedWanted = showAds;
             if (!OnDevice) return;
-            MobileAds.RaiseAdEventsOnUnityMainThread = true;   // 広告の返事を Unity の流れの中で受ける
+            bridge = PachiTrackingBridge.Get(this);   // 返事を Unity の流れで動かす受け口を、先に Unity の流れで作る
             Step("1 同意の確認中");
-            ConsentInformation.Update(new ConsentRequestParameters(), updateError =>
+            ConsentInformation.Update(new ConsentRequestParameters(), updateError => OnMain(() =>
             {
                 if (updateError != null) { Debug.LogWarning("[Ads] 同意の確認 " + updateError.Message); Fail("同意:" + updateError.Message); }
                 Step("2 同意の画面");
-                ConsentForm.LoadAndShowConsentFormIfRequired(formError =>
+                ConsentForm.LoadAndShowConsentFormIfRequired(formError => OnMain(() =>
                 {
                     if (formError != null) { Debug.LogWarning("[Ads] 同意の画面 " + formError.Message); Fail("同意画面:" + formError.Message); }
                     Step("3 追跡の許可の返事待ち");
-                    PachiTrackingBridge.Get(this);
                     PachiTracking_Request();   // 返事は OnTrackingDone
-                });
-            });
+                }));
+            }));
         }
+
+        // 広告の部品の返事は Unity の流れとは別の流れで来ることがある。Unity の物に触る前に移す
+        void OnMain(Action a) => bridge.Queue.Post(a);
 
         internal void OnTrackingDone()
         {
             if (started) return;
             Step("4 広告の部品を始める");
-            MobileAds.Initialize(_ =>
+            MobileAds.Initialize(_ => OnMain(() =>
             {
                 started = true;
                 Step("5 始まった");
                 if (bannerWanted) LoadBanner();
                 if (rewardedWanted) LoadRewarded();
-            });
+            }));
         }
 
         /// <summary>広告を消したら、すぐ false にする</summary>
@@ -89,27 +94,27 @@ namespace PachiMoji
         void LoadBanner()
         {
             banner = new BannerView(AdIds.Banner, AdSize.Banner, AdPosition.Bottom);   // 320×50。下の 62 の場所に収まる
-            banner.OnBannerAdLoadFailed += e => { Debug.LogWarning("[Ads] バナーを読めない " + e.GetMessage()); Fail("バナー:" + e.GetMessage()); };
-            banner.OnBannerAdLoaded += () => Step(Stage + "・バナーOK");
+            banner.OnBannerAdLoadFailed += e => OnMain(() => { Debug.LogWarning("[Ads] バナーを読めない " + e.GetMessage()); Fail("バナー:" + e.GetMessage()); });
+            banner.OnBannerAdLoaded += () => OnMain(() => Step(Stage + "・バナーOK"));
             banner.LoadAd(new AdRequest());
         }
 
         void LoadRewarded()
         {
             SetRewarded(AdState.Loading);
-            RewardedAd.Load(AdIds.Rewarded, new AdRequest(), (ad, error) =>
+            RewardedAd.Load(AdIds.Rewarded, new AdRequest(), (ad, error) => OnMain(() =>
             {
                 if (error != null || ad == null)
                 {
                     Debug.LogWarning("[Ads] ごほうび広告を読めない " + error?.GetMessage());
                     Fail("ごほうび:" + error?.GetMessage());
                     SetRewarded(AdState.Failed);
-                    PachiTrackingBridge.Get(this).StartCoroutine(Retry());
+                    bridge.StartCoroutine(Retry());
                     return;
                 }
                 rewarded = ad;
                 SetRewarded(AdState.Ready);
-            });
+            }));
         }
 
         IEnumerator Retry()
@@ -142,20 +147,20 @@ namespace PachiMoji
             var ad = rewarded;
             rewarded = null;
             SetRewarded(AdState.Loading);
-            ad.OnAdFullScreenContentClosed += () =>
+            ad.OnAdFullScreenContentClosed += () => OnMain(() =>
             {
                 ad.Destroy();
                 done(earned);
                 if (rewardedWanted) LoadRewarded();
-            };
-            ad.OnAdFullScreenContentFailed += e =>
+            });
+            ad.OnAdFullScreenContentFailed += e => OnMain(() =>
             {
                 Debug.LogWarning("[Ads] ごほうび広告を出せない " + e.GetMessage());
                 ad.Destroy();
                 done(false);
                 if (rewardedWanted) LoadRewarded();
-            };
-            ad.Show(_ => earned = true);
+            });
+            ad.Show(_ => OnMain(() => earned = true));   // 閉じた知らせより先に届く（同じ行列で順に動く）
         }
 
         void SetRewarded(AdState s)
