@@ -16,7 +16,7 @@ namespace PachiMoji.EditorTools
     /// アプリ化の手元確認：iPhone 用の設定・片付け、演出と画面の絵（pachieffect/captures/*.png）。
     /// コマンドから -executeMethod PachiMoji.EditorTools.PachiAppCheck.Run で動かす（app-check.sh）。
     /// </summary>
-    public static class PachiAppCheck
+    public static partial class PachiAppCheck
     {
         static int failed;
         static readonly string[] Words = { "定時", "退社" };
