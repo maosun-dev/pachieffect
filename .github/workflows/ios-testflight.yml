@@ -136,6 +136,12 @@ jobs:
           # 書き出した動画を写真に保存するときの許可の文（初回に iPhone が出す）
           /usr/libexec/PlistBuddy -c "Delete :NSPhotoLibraryAddUsageDescription" "$PLIST" 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 書き出した動画を写真に保存するために使います" "$PLIST"
+          # アプリの言語は日本語（Unity の初期値は英語で、App Store に「EN」と出ていた。2026-10-30）
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleDevelopmentRegion" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string ja" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string ja" "$PLIST"
           echo "組み立て番号 $BUILD"
 
       # ここでは署名しない（署名すると開発用の証明書が要り、それには iPhone の登録が要る）。
@@ -143,6 +149,25 @@ jobs:
       # 広告の部品（Google Mobile Ads）は CocoaPods で取ってくる。Linux 機では入れられないので、ここで入れる
       - name: 広告の部品を取ってくる（pod install）
         run: cd iOS && pod install --repo-update
+
+      # 日本語の言語フォルダ（ja.lproj）をアプリに入れる。App Store はアプリの中の言語フォルダで対応言語を決める。
+      # Xcode の作りの書き換えには、CocoaPods に付いてくる xcodeproj を使う
+      - name: 日本語の言語フォルダを足す
+        run: |
+          mkdir -p iOS/ja.lproj
+          printf '"CFBundleDisplayName" = "脳汁メーカー";\n' > iOS/ja.lproj/InfoPlist.strings
+          ruby -rxcodeproj -e '
+            p = Xcodeproj::Project.open("iOS/Unity-iPhone.xcodeproj")
+            p.root_object.development_region = "ja"
+            p.root_object.known_regions = (p.root_object.known_regions + ["ja"]).uniq
+            t = p.targets.find { |x| x.name == "Unity-iPhone" }
+            g = p.main_group.new_variant_group("InfoPlist.strings")
+            r = g.new_reference("ja.lproj/InfoPlist.strings")
+            r.name = "ja"
+            t.resources_build_phase.add_file_reference(g)
+            p.save
+          '
+          echo "言語の一覧：$(grep -A3 knownRegions iOS/Unity-iPhone.xcodeproj/project.pbxproj | tr -d '\n ')"
 
       - name: アプリを組み立てる（archive）
         run: |
@@ -161,6 +186,8 @@ jobs:
           find "$APP/Frameworks" -maxdepth 1 -name '*.framework' \
             -exec codesign --force --sign - --timestamp=none {} \;
           codesign --force --sign - --timestamp=none "$APP"
+          echo "アプリの中の言語フォルダ：$(cd "$APP" && ls -d *.lproj 2>/dev/null | tr '\n' ' ')"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDevelopmentRegion" "$APP/Info.plist"
 
       - name: TestFlight に送る
         run: |

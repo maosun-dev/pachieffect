@@ -178,7 +178,7 @@ namespace PachiMoji.EditorTools
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, BundleId);
             PlayerSettings.productName = AppName;
             PlayerSettings.companyName = "maosun-dev";
-            PlayerSettings.bundleVersion = "1.0.0";
+            PlayerSettings.bundleVersion = "1.0.1";
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.statusBarHidden = true;
             PlayerSettings.iOS.targetDevice = iOSTargetDevice.iPhoneOnly;
