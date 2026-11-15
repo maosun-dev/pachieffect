@@ -316,7 +316,7 @@ namespace PachiMoji
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
             + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom
             + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiBlueBack
-            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale + settings.ObiLayout;
+            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale + settings.ObiLayout + settings.ObiSpin;
 
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()

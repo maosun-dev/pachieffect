@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS", "exportWide", "obiLayout" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS", "exportWide", "obiLayout", "obiSpin" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -278,6 +278,18 @@ namespace PachiMoji.Tests
             Assert.AreEqual(ObiLayout.Slant, EffectSettings.Load(P).ObiLayout);
             new EffectSettings { ObiLayout = ObiLayout.Straight }.Save(P);
             Assert.AreEqual(ObiLayout.Straight, EffectSettings.Load(P).ObiLayout);
+        }
+
+        [Test]
+        public void 字の回転の既定はなしで保存できる()
+        {
+            var d = EffectSettings.Load(P);
+            Assert.AreEqual(ObiSpin.None, d.ObiSpin);
+            Assert.AreEqual(0, d.ObiSpinCount);
+            new EffectSettings { ObiSpin = ObiSpin.Fast }.Save(P);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(ObiSpin.Fast, s.ObiSpin);
+            Assert.Greater(s.ObiSpinCount, new EffectSettings { ObiSpin = ObiSpin.Slow }.ObiSpinCount);
         }
     }
 }

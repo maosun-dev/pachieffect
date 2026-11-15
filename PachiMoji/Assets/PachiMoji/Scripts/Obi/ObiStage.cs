@@ -142,6 +142,7 @@ namespace PachiMoji
                 lanes[li].parent = inner;
             }
             int unit = chars.Count + 1;
+            int spinCount = settings.ObiSpinCount;
             var rnd = new System.Random(20261115);   // キラキラの散らし方（いつも同じ）
             var starMat = new Material(Shader.Find("PachiMoji/Glint"));
             starMat.SetColor("_Color", new Color(1f, 0.96f, 0.8f));
@@ -163,7 +164,10 @@ namespace PachiMoji
                     var tp = templates[chars[ci]];
                     var holder = new GameObject("Letter");
                     holder.transform.SetParent(lane.parent, false);
-                    var copy = Object.Instantiate(tp.go, holder.transform);
+                    // 字の向きと回転をつける入れ物（字のまん中を中心に回るように、字はこの下に置く）
+                    var spin = new GameObject("Spin").transform;
+                    spin.SetParent(holder.transform, false);
+                    var copy = Object.Instantiate(tp.go, spin);
                     copy.SetActive(true);
                     copy.transform.localScale = new Vector3(scale * ObiPlan.Squeeze, scale, scale);
                     copy.transform.localPosition = -new Vector3(tp.c.x * scale * ObiPlan.Squeeze, refCy * scale, tp.c.z * scale);
@@ -171,7 +175,9 @@ namespace PachiMoji
                     var rig = copy.GetComponent<PachiText.Rig>();
                     for (int g = 0; g < rig.glints.Count; g++) rig.glints[g].gameObject.SetActive(k % 4 == 0 && g == 0);
                     // まっすぐの帯は、上の列も下の列も同じ向き（傾きをそろえる）
-                    copy.transform.localRotation = straight || lane.dir < 0 ? TopTurn : BottomTurn;
+                    var turn = straight || lane.dir < 0 ? TopTurn : BottomTurn;
+                    spin.localRotation = turn;
+                    if (spinCount > 0) st.spins.Add((spin, turn, k, spinCount));
                     st.letters.Add((holder.transform, lane, k * ObiPlan.Spacing, 0, false));
                 }
 
@@ -328,8 +334,13 @@ namespace PachiMoji
 
         readonly List<Material> fires = new List<Material>();   // 帯の炎（時刻を入れて流す）
 
+        // 字の回転（入れ物・もとの向き・並びの番号・10 秒の回数）
+        readonly List<(Transform node, Quaternion turn, int slot, int count)> spins = new List<(Transform, Quaternion, int, int)>();
+
         public void Evaluate(float t)
         {
+            foreach (var sp in spins)
+                sp.node.localRotation = Quaternion.AngleAxis(ObiPlan.SpinAngle(t, sp.slot, sp.count), Vector3.up) * sp.turn;
             foreach (var f in fires) f.SetFloat("_T", t);
             if (back != null) back.SetFloat("_T", t);
             block ??= new MaterialPropertyBlock();
@@ -381,7 +392,7 @@ namespace PachiMoji
                 Kill(profile);
             }
             root = null; volumeGo = null; profile = null; cam = null; photoQuad = null; back = null;
-            letters.Clear(); fires.Clear(); stars.Clear();
+            letters.Clear(); fires.Clear(); stars.Clear(); spins.Clear();
         }
 
         static void Kill(Object o)

@@ -105,6 +105,8 @@ namespace PachiMoji
                 i => settings.ObiBlueBack = i == 1);
             m.Choice(parent, ref y, "帯の置き方", new[] { "斜め", "上下をまっすぐ" }, null, (int)settings.ObiLayout, 150,
                 i => settings.ObiLayout = (ObiLayout)i);
+            m.Choice(parent, ref y, "字の回転（1文字ずつ回る）", new[] { "なし", "ゆっくり", "速い" }, null, (int)settings.ObiSpin, 104,
+                i => settings.ObiSpin = (ObiSpin)i);
             m.obiH = -y + 24;
             m.SetEffect(settings.EffectId);
 
@@ -126,6 +128,9 @@ namespace PachiMoji
             b.sizeDelta = Vector2.zero;
             return b;
         }
+
+        /// <summary>激アツの帯の項目を出しているか</summary>
+        public bool ShowsObi => obiBox.gameObject.activeSelf;
 
         /// <summary>選んでいる演出の項目だけを出す（開くたびに呼ぶ）</summary>
         public void SetEffect(string effectId)

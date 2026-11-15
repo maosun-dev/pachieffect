@@ -10,6 +10,7 @@ namespace PachiMoji
     public enum ObiRed { None, Half, Strong }
     public enum ObiGlow { None, Gold, Fire }
     public enum ObiGlowAmount { Low, Mid, High }
+    public enum ObiSpin { None, Slow, Fast }      // 激アツの帯の字の回転：なし・ゆっくり・速い（1文字ずつ順番に回る）
     public enum ObiLayout { Slant, Straight }   // 激アツの帯の置き方：斜め・上下をまっすぐ（縦・横どちらの書き出しにも効く）
     /// <summary>演出の好み。端末（PlayerPrefs）に残し、再生にも書き出しにも同じように効く</summary>
     public class EffectSettings
@@ -37,6 +38,9 @@ namespace PachiMoji
         // 激アツの帯：上の列・下の列のずらし（画面の高さを 10 とする単位）と大きさ（指で合わせる）
         public Vector2 ObiTopOffset, ObiBottomOffset;
         public ObiLayout ObiLayout = ObiLayout.Slant;   // 激アツの帯：帯の置き方
+        public ObiSpin ObiSpin = ObiSpin.None;        // 激アツの帯：字の回転
+        /// <summary>10 秒に回る回数（整数。くり返しでつなぎ目が出ない）</summary>
+        public int ObiSpinCount => ObiSpin switch { ObiSpin.Slow => 2, ObiSpin.Fast => 4, _ => 0 };
         public bool ExportWide;                       // 書き出す動画の向き（false＝縦 1080×1920、true＝横 1920×1080）。どの演出にも効く
         public float ObiTopScale = 1, ObiBottomScale = 1;
 
@@ -92,6 +96,7 @@ namespace PachiMoji
             s.ObiBlueBack = PlayerPrefs.GetInt(prefix + "obiBlueBack", 0) != 0;
             s.ExportWide = PlayerPrefs.GetInt(prefix + "exportWide", 0) != 0;
             s.ObiLayout = (ObiLayout)Pick(prefix + "obiLayout", 0, 1);
+            s.ObiSpin = (ObiSpin)Pick(prefix + "obiSpin", 0, 2);
             s.ObiTopOffset = ClampObiOffset(new Vector2(PlayerPrefs.GetFloat(prefix + "obiTopX", 0), PlayerPrefs.GetFloat(prefix + "obiTopY", 0)));
             s.ObiBottomOffset = ClampObiOffset(new Vector2(PlayerPrefs.GetFloat(prefix + "obiBotX", 0), PlayerPrefs.GetFloat(prefix + "obiBotY", 0)));
             s.ObiTopScale = ClampObiScale(PlayerPrefs.GetFloat(prefix + "obiTopS", 1));
@@ -121,6 +126,7 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "obiBlueBack", ObiBlueBack ? 1 : 0);
             PlayerPrefs.SetInt(prefix + "exportWide", ExportWide ? 1 : 0);
             PlayerPrefs.SetInt(prefix + "obiLayout", (int)ObiLayout);
+            PlayerPrefs.SetInt(prefix + "obiSpin", (int)ObiSpin);
             PlayerPrefs.SetFloat(prefix + "obiTopX", ObiTopOffset.x);
             PlayerPrefs.SetFloat(prefix + "obiTopY", ObiTopOffset.y);
             PlayerPrefs.SetFloat(prefix + "obiTopS", ObiTopScale);

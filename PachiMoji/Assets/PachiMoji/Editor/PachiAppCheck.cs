@@ -245,7 +245,7 @@ namespace PachiMoji.EditorTools
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_bottom.png"), new EffectSettings(), bottom: true);
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_obi_top.png"), new EffectSettings { EffectId = "obi", ExportWide = true }, scrollTo: 1);
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_obi.png"), new EffectSettings { EffectId = "obi", ObiDepth = ObiDepth.Low, ObiRed = ObiRed.Half }, sc =>
-                    Expect(!sc.Scrollable, "帯の設定は帯の項目だけ（王道昇格の項目は出ない）"));
+                    Expect(sc.ShowsObi, "帯の設定は帯の項目だけ（王道昇格の項目は出ない）"));
                 // 昇格の色・チラ見せ（iPhone SE の 9:16 で、まん中あたりまで動かした姿）
                 var chainSettings = new EffectSettings { Chain = new[] { Tier.Green, Tier.Red, Tier.Rainbow }, TeaseCount = 3, TeaseText = Tier.Gold, TeaseBack = Tier.Purple };
                 ShotSettings(720, 1280, Path.Combine(outDir, "settings_chain.png"), chainSettings, sc =>
@@ -325,8 +325,10 @@ namespace PachiMoji.EditorTools
                     PlayerPrefs.Save();
                 }
 
-                // 動画の書き出し（PNG の版で、アプリと同じ VideoExporter を動かす）
-                CheckExport(outDir);
+                // 動画の書き出し（PNG の版で、アプリと同じ VideoExporter を動かす）。
+                // とても重い（Unity が 24GB ほどメモリを使ってパソコンごと落ちたことがある）ので、PACHI_FULL=1 のときだけ
+                if (Environment.GetEnvironmentVariable("PACHI_FULL") == "1") CheckExport(outDir);
+                else Debug.Log("[PachiAppCheck] 書き出しの確かめは飛ばした（PACHI_FULL=1 sh app-check.sh で流す）");
             }
             catch (Exception e)
             {
@@ -804,6 +806,9 @@ namespace PachiMoji.EditorTools
             uiCam.targetTexture = null;
             rt.Release();
             File.WriteAllBytes(path, tex.EncodeToPNG());
+            // 撮るたびに作った絵を消す（残すとメモリが増え続ける）
+            UnityEngine.Object.DestroyImmediate(tex);
+            UnityEngine.Object.DestroyImmediate(rt);
             Debug.Log("[PachiAppCheck] 書き出し " + path);
         }
 

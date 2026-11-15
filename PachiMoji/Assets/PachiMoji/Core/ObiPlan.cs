@@ -78,6 +78,19 @@ namespace PachiMoji
             return pts;
         }
 
+        /// <summary>
+        /// 字の回転（1文字ずつ順番にくるっと1回転）：10 秒で count 回、字ごとに少しずつずれて回る。
+        /// 回っているのは1回のうちの一部（SpinWindow）だけで、ほかは正面（0 度）。count は整数なので 10 秒で元に戻る
+        /// </summary>
+        public static float SpinAngle(float t, int slot, int count)
+        {
+            if (count <= 0) return 0;
+            float u = Mathf.Repeat(count * t / Duration - slot * 0.07f, 1f);
+            if (u >= SpinWindow) return 0;
+            return 360f * Mathf.SmoothStep(0, 1, u / SpinWindow);
+        }
+        public const float SpinWindow = 0.3f;
+
         /// <summary>帯の点の並び（画面の左→右）。上は θ=π→0、下は θ=π→2π</summary>
         public static Vector3[] ArcPoints(ObiRing ring, bool top, int n)
         {

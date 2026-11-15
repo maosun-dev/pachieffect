@@ -36,6 +36,8 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_16x9.png"), 1920, 1080, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_16x9_photo.png"), 1920, 1080, 2, 0, settings, true);
                 Shoot(Path.Combine(outDir, "obi_9x16_straight.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiLayout = ObiLayout.Straight }, true);
+                for (float t = 0; t < 2.6f; t += 0.2f)
+                    Shoot(Path.Combine(outDir, $"obi_spin_{t:0.0}.png"), 540, 960, 1, t, new EffectSettings { EffectId = "obi", ObiSpin = ObiSpin.Slow, ObiLayout = ObiLayout.Straight }, false);
                 Shoot(Path.Combine(outDir, "obi_16x9_straight.png"), 1920, 1080, 2, 0, new EffectSettings { EffectId = "obi", ObiLayout = ObiLayout.Straight }, true);
                 Shoot(Path.Combine(outDir, "obi_fit.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiTopOffset = new Vector2(0, 0.8f), ObiTopScale = 0.8f, ObiBottomScale = 1.2f }, false);
                 Shoot(Path.Combine(outDir, "obi_blueback.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiBlueBack = true }, true);

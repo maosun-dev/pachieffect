@@ -1,5 +1,6 @@
 #!/bin/sh
 # Unity を裏で動かして、アプリ化の手元確認（くり返し再生・設定・絵）をする
+# 書き出しの確かめ（とても重い）も流すときは PACHI_FULL=1 sh app-check.sh
 ROOT="C:/Users/USER/Desktop/game/pachieffect"
 mkdir -p "$ROOT/captures"
 rm -f "$ROOT/captures/unity.log"

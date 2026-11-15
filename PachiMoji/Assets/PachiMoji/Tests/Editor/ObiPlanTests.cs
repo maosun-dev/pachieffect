@@ -125,6 +125,23 @@ namespace PachiMoji.Tests
         }
 
         [Test]
+        public void 字の回転は10秒で元に戻り回らないあいだは正面()
+        {
+            for (int k = 0; k < 12; k++)
+            {
+                // 360 度と 0 度は同じ向きなので、角度の差で比べる
+                Assert.AreEqual(0f, Mathf.DeltaAngle(ObiPlan.SpinAngle(0, k, 3), ObiPlan.SpinAngle(ObiPlan.Duration, k, 3)), 0.5f);
+                Assert.AreEqual(0f, ObiPlan.SpinAngle(4.2f, k, 0));   // 回数 0 は回らない
+            }
+            // 1回の中で、回っているのは一部の時間だけ（それ以外は正面＝0 度）
+            int front = 0;
+            for (int i = 0; i < 100; i++) if (Mathf.Abs(Mathf.DeltaAngle(0, ObiPlan.SpinAngle(i * 0.1f, 0, 2))) < 1e-3f) front++;
+            Assert.Greater(front, 50);
+            // となりの字は少しずれて回る
+            Assert.AreNotEqual(ObiPlan.SpinAngle(0.5f, 0, 2), ObiPlan.SpinAngle(0.5f, 1, 2));
+        }
+
+        [Test]
         public void 帯の点は左から右に並ぶ()
         {
             var top = ObiPlan.ArcPoints(ObiPlan.Top, true, 100);
