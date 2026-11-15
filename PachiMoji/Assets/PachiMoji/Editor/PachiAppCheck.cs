@@ -296,15 +296,13 @@ namespace PachiMoji.EditorTools
                     Expect(ui.EffectButton.GetComponent<CanvasGroup>().interactable && !ui.PhotoButton.GetComponent<CanvasGroup>().interactable,
                         "王道昇格の待ち：演出のボタンを押せて、写真のボタンは無い"));
                 ShotMain(720, 1560, Path.Combine(outDir, "main_effect_obi.png"), "定時", "退社", AppState.Idle, ui =>
-                    Expect(ui.PhotoButton.GetComponent<CanvasGroup>().interactable && ui.PhotoButton.GetComponentInChildren<TMPro.TMP_Text>().text == "写真・動画を入れる",
-                        "帯の待ち：写真・動画を入れるボタン"), new EffectSettings { EffectId = "obi" });
+                    Expect(ui.PhotoButton.GetComponent<CanvasGroup>().interactable && ui.PhotoButton.GetComponentInChildren<TMPro.TMP_Text>().text.StartsWith("編集する"),
+                        "帯の待ち：編集するボタン"), new EffectSettings { EffectId = "obi" });
                 ShotMain(720, 1560, Path.Combine(outDir, "main_finished_obi.png"), "定時", "退社", AppState.Finished, ui =>
                     Expect(!ui.EffectButton.GetComponent<CanvasGroup>().interactable && !ui.PhotoButton.GetComponent<CanvasGroup>().interactable,
                         "終わりの画面では演出・写真のボタンは出ない"), new EffectSettings { EffectId = "obi" });
                 ShotEffectPick(720, 1560, Path.Combine(outDir, "effect_pick.png"));
                 ShotPhotoAdjust(720, 1560, Path.Combine(outDir, "photo_adjust.png"));
-                ShotMain(720, 1560, Path.Combine(outDir, "main_effect_obi_band.png"), "定時", "退社", AppState.Idle, ui =>
-                    Expect(ui.BandButton.GetComponent<CanvasGroup>().interactable, "帯の待ち：帯を合わせるボタン"), new EffectSettings { EffectId = "obi" });
 
                 // 広告：追跡の許可（ATT）の部品は iPhone だけ。手元（Editor）では広告を動かさず、ごほうびは見終えた扱い
                 var att = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiTracking.mm") as PluginImporter;
@@ -504,7 +502,7 @@ namespace PachiMoji.EditorTools
             uiCam.targetTexture = rt;
             var root = MainScreen.CreateCanvas(uiCam);
             var ui = MainScreen.Build(root, safe, new Vector2(w, h));
-            var view = PhotoAdjustView.Build(root, safe, new Vector2(w, h), ui.StagePlayArea);
+            var view = EditView.Build(root, safe, new Vector2(w, h), ui.StageView.rectTransform);
             ui.SetDeckSink(1);
             ui.ShowState(AppState.PhotoAdjust);
             Canvas.ForceUpdateCanvases();
@@ -514,11 +512,15 @@ namespace PachiMoji.EditorTools
             stage.SetFull(true);
             var obi = (ObiEffect)stage.Effect;
             Expect(obi.HasPhoto, "合わせる画面の帯に写真が入る");
-            view.Moved += (o, z) => obi.SetPhotoFit(o, z);
-            view.Begin(fx.PhotoOffset, fx.PhotoZoom, obi.PhotoAspect);
-            view.SetFit(new Vector2(9, 9), 9);
-            Expect(Mathf.Approximately(view.Zoom, PhotoFit.MaxZoom), "大きくしすぎても 4 倍で止まる");
-            view.SetFit(fx.PhotoOffset, fx.PhotoZoom);
+            view.MediaMoved += (o, z) => obi.SetPhotoFit(o, z);
+            view.LaneMoved += (lane, o, z) => obi.SetLaneFit(lane, o, z);
+            view.Begin(fx.PhotoOffset, fx.PhotoZoom, obi.PhotoAspect, obi.HasPhoto, Vector2.zero, 1, Vector2.zero, 1, obi.UnitsPerScreenHeight, 9f / 16);
+            Expect(view.Current == EditView.Target.Media, "写真があれば、編集は写真・動画から始まる");
+            view.Select(EditView.Target.Top);
+            view.SetLane(0, new Vector2(0, 99), 9);
+            Expect(Mathf.Approximately(view.LaneScale(0), EffectSettings.ObiScaleMax) && Mathf.Approximately(view.MediaZoom, 1.2f),
+                "上の帯を動かしても写真は動かない・大きくしすぎても止まる");
+            view.SetLane(0, Vector2.zero, 1);
             obi.Idle(1f);
             stage.Frame();
             stage.Effect.Camera.Render();

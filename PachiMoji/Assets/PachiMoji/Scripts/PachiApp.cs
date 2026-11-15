@@ -30,8 +30,7 @@ namespace PachiMoji
         SettingsScreen settingsUi;
         ShopScreen shopUi;
         EffectPickScreen effectUi;
-        PhotoAdjustView photoUi;
-        BandAdjustView bandUi;
+        EditView editUi;
         ICover cover;   // いま開いている・閉じかけている上の画面
         Camera uiCam;
         AppState state;
@@ -58,18 +57,15 @@ namespace PachiMoji
             effectUi.Back.onClick.AddListener(CloseEffectPick);
             effectUi.Picked += OnEffectPicked;
             stage = new StageScreen(ui, uiCam);
-            photoUi = PhotoAdjustView.Build(root, Screen.safeArea, ScreenPx, ui.StagePlayArea);
-            photoUi.Moved += (o, z) => (stage.Effect as ObiEffect)?.SetPhotoFit(o, z);
-            photoUi.RangeChanged += (a, b) => (stage.Effect as ObiEffect)?.SetVideoRange(a, b);
-            photoUi.Done.onClick.AddListener(PhotoDone);
-            photoUi.Remove.onClick.AddListener(PhotoRemove);
-            photoUi.Change.onClick.AddListener(PickPhoto);
+            editUi = EditView.Build(root, Screen.safeArea, ScreenPx, ui.StageView.rectTransform);
+            editUi.MediaMoved += (o, z) => (stage.Effect as ObiEffect)?.SetPhotoFit(o, z);
+            editUi.LaneMoved += (lane, o, z) => (stage.Effect as ObiEffect)?.SetLaneFit(lane, o, z);
+            editUi.RangeChanged += (a, b) => (stage.Effect as ObiEffect)?.SetVideoRange(a, b);
+            editUi.Done.onClick.AddListener(EditDone);
+            editUi.Remove.onClick.AddListener(PhotoRemove);
+            editUi.Pick.onClick.AddListener(PickPhoto);
             ui.EffectButton.onClick.AddListener(OpenEffectPick);
-            ui.PhotoButton.onClick.AddListener(OnPhotoButton);
-            bandUi = BandAdjustView.Build(root, Screen.safeArea, ScreenPx);
-            bandUi.Moved += (lane, o, z) => (stage.Effect as ObiEffect)?.SetLaneFit(lane, o, z);
-            bandUi.Done.onClick.AddListener(BandDone);
-            ui.BandButton.onClick.AddListener(OpenBandAdjust);
+            ui.PhotoButton.onClick.AddListener(OpenEdit);
             ui.Line1.text = PlayerPrefs.GetString(WordsKey1, "定時");
             ui.Line2.text = PlayerPrefs.GetString(WordsKey2, "退社");
             ui.Line1.onValueChanged.AddListener(_ => Validate());
@@ -145,7 +141,7 @@ namespace PachiMoji
                     settings.VideoEnd = obiFx.VideoLength;
                     obiFx.SetVideoRange(settings.VideoStart, settings.VideoEnd);
                     settings.Save();
-                    if (state == AppState.PhotoAdjust) photoUi.SetVideo(settings.VideoStart, settings.VideoEnd, obiFx.VideoLength);
+                    if (state == AppState.PhotoAdjust) editUi.SetVideo(settings.VideoStart, settings.VideoEnd, obiFx.VideoLength);
                 }
             }
             switch (state)
@@ -155,7 +151,6 @@ namespace PachiMoji
                 case AppState.Shop:
                 case AppState.EffectPick:
                 case AppState.PhotoAdjust:
-                case AppState.BandAdjust:
                     idleT = Mathf.Repeat(idleT + dt, 1000f);
                     fx.Idle(idleT);
                     break;
@@ -388,7 +383,7 @@ namespace PachiMoji
         static float Smooth(float x) => x * x * (3 - 2 * x);
 
         // 舞台を再生の範囲いっぱいに描く状態（再生・終わり・写真を合わせる）
-        static bool FullStage(AppState s) => s == AppState.Playing || s == AppState.Finished || s == AppState.PhotoAdjust || s == AppState.BandAdjust;
+        static bool FullStage(AppState s) => s == AppState.Playing || s == AppState.Finished || s == AppState.PhotoAdjust;
 
         // ───────── 演出を選ぶ・写真 ─────────
 
@@ -422,22 +417,46 @@ namespace PachiMoji
             Rebuild();   // 演出が変わっていれば組み立て直す
         }
 
-        // 「写真を入れる／合わせる」：写真が無ければ選ぶ、あれば合わせる画面へ
-        void OnPhotoButton()
+        // 「編集」：写真・動画と、上下の帯を、1つの画面で動かす（PhotoAdjust の状態）
+        void OpenEdit()
         {
-            if (state != AppState.Idle || sinkDir != 0) return;
-            if (string.IsNullOrEmpty(settings.PhotoPath)) PickPhoto();
-            else OpenPhotoAdjust();
+            if (state != AppState.Idle || sinkDir != 0 || !(stage.Effect is ObiEffect)) return;
+            EventSystem.current?.SetSelectedGameObject(null);
+            ui.SetDeckSink(1);   // 入力の板と PUSH を隠して、舞台を広げる
+            SetState(AppState.PhotoAdjust);
+            BeginEdit();
         }
 
-        // 写真を選ぶ。選べたら前の写真を消して、合わせる画面へ
+        void BeginEdit()
+        {
+            if (!(stage.Effect is ObiEffect obi)) return;
+            var size = ExportPlan.Size(settings.ExportWide);
+            editUi.Begin(settings.PhotoOffset, settings.PhotoZoom, obi.PhotoAspect, obi.HasPhoto,
+                settings.ObiTopOffset, settings.ObiTopScale, settings.ObiBottomOffset, settings.ObiBottomScale,
+                obi.UnitsPerScreenHeight, (float)size.x / size.y);
+            editUi.SetVideo(settings.VideoStart, settings.VideoEnd, obi.HasVideo ? Mathf.Max(obi.VideoLength, settings.VideoEnd) : 0);
+        }
+
+        // 編集の途中の値を設定へ移す（写真を選び直すときや、できたとき）
+        void KeepEdit()
+        {
+            settings.PhotoOffset = editUi.MediaOffset;
+            settings.PhotoZoom = editUi.MediaZoom;
+            settings.ObiTopOffset = editUi.LaneOffset(0); settings.ObiTopScale = editUi.LaneScale(0);
+            settings.ObiBottomOffset = editUi.LaneOffset(1); settings.ObiBottomScale = editUi.LaneScale(1);
+            if (stage.Effect is ObiEffect obi && obi.HasVideo) { settings.VideoStart = editUi.VideoStart; settings.VideoEnd = editUi.VideoEnd; }
+            settings.Save();
+        }
+
+        // 写真・動画を選ぶ。選べたら前のものを消して、編集を続ける
         void PickPhoto()
         {
-            if (state != AppState.Idle && state != AppState.PhotoAdjust) return;
+            if (state != AppState.PhotoAdjust) return;
+            KeepEdit();
             PhotoPicker.Pick((r, path, len) =>
             {
                 if (r == PhotoPickResult.Failed) { ui.Notice.text = "写真・動画を読み込めませんでした。別のものを選んでください"; return; }
-                if (r != PhotoPickResult.Picked) return;
+                if (r != PhotoPickResult.Picked || state != AppState.PhotoAdjust) return;
                 string old = settings.PhotoPath;
                 settings.PhotoPath = path;
                 settings.PhotoOffset = Vector2.zero;
@@ -448,77 +467,31 @@ namespace PachiMoji
                 settings.Save();
                 if (!string.IsNullOrEmpty(old) && old != path) PhotoStore.Delete(old);
                 Rebuild();
-                if (state == AppState.PhotoAdjust) BeginPhotoAdjust(); else OpenPhotoAdjust();
+                BeginEdit();
             });
-        }
-
-        void OpenPhotoAdjust()
-        {
-            if (!(stage.Effect is ObiEffect obi) || !obi.HasPhoto) return;
-            EventSystem.current?.SetSelectedGameObject(null);
-            ui.SetDeckSink(1);   // 入力の板と PUSH を隠して、舞台を広げる
-            SetState(AppState.PhotoAdjust);
-            BeginPhotoAdjust();
-        }
-
-        void BeginPhotoAdjust()
-        {
-            if (stage.Effect is ObiEffect obi)
-            {
-                photoUi.Begin(settings.PhotoOffset, settings.PhotoZoom, obi.PhotoAspect);
-                photoUi.SetVideo(settings.VideoStart, settings.VideoEnd, obi.HasVideo ? Mathf.Max(obi.VideoLength, settings.VideoEnd) : 0);
-            }
-        }
-
-        void PhotoDone()
-        {
-            if (state != AppState.PhotoAdjust) return;
-            settings.PhotoOffset = photoUi.Offset;
-            settings.PhotoZoom = photoUi.Zoom;
-            if (stage.Effect is ObiEffect obi && obi.HasVideo) { settings.VideoStart = photoUi.VideoStart; settings.VideoEnd = photoUi.VideoEnd; }
-            settings.Save();
-            ClosePhotoAdjust();
         }
 
         void PhotoRemove()
         {
             if (state != AppState.PhotoAdjust) return;
+            KeepEdit();
             PhotoStore.Delete(settings.PhotoPath);
             settings.PhotoPath = "";
             settings.PhotoOffset = Vector2.zero;
             settings.PhotoZoom = 1;
             settings.Save();
-            ClosePhotoAdjust();
-        }
-
-        // 帯の位置と大きさを合わせる画面
-        void OpenBandAdjust()
-        {
-            if (state != AppState.Idle || sinkDir != 0 || !(stage.Effect is ObiEffect obi)) return;
-            EventSystem.current?.SetSelectedGameObject(null);
-            ui.SetDeckSink(1);
-            SetState(AppState.BandAdjust);
-            bandUi.Begin(settings.ObiTopOffset, settings.ObiTopScale, settings.ObiBottomOffset, settings.ObiBottomScale, obi.UnitsPerScreenHeight);
-        }
-
-        void BandDone()
-        {
-            if (state != AppState.BandAdjust) return;
-            settings.ObiTopOffset = bandUi.Offset(0); settings.ObiTopScale = bandUi.Scale(0);
-            settings.ObiBottomOffset = bandUi.Offset(1); settings.ObiBottomScale = bandUi.Scale(1);
-            settings.Save();
-            bandUi.Show(false);
-            ui.SetDeckSink(0);
-            SetState(AppState.Idle);
-            Rebuild();   // 見える範囲が変わるので組み立て直す（帯の端が画面に出ないように）
-        }
-
-        void ClosePhotoAdjust()
-        {
-            photoUi.Show(false);
-            ui.SetDeckSink(0);
-            SetState(AppState.Idle);
             Rebuild();
+            BeginEdit();
+        }
+
+        void EditDone()
+        {
+            if (state != AppState.PhotoAdjust) return;
+            KeepEdit();
+            editUi.Show(false);
+            ui.SetDeckSink(0);
+            SetState(AppState.Idle);
+            Rebuild();   // 帯の見える範囲が変わるので組み立て直す
         }
 
         void OpenSettings()

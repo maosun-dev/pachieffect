@@ -26,6 +26,7 @@ namespace PachiMoji
             public float loop, speed;
             public int dir;
             public Transform parent;   // 列の入れ物（指で合わせたずらし・大きさ）
+            public Vector3 camLocal;   // カメラの位置を、列の入れ物の中の座標で（字と光の面をカメラへ向けるのに使う）
 
             public void At(float s, out Vector3 p, out Vector3 tan)
             {
@@ -139,8 +140,9 @@ namespace PachiMoji
                 inner.localPosition = -pivots[li];
                 st.laneOuter[li] = outer;
                 st.lanePivot[li] = pivots[li];
-                st.SetLaneFit(li, fits[li].Item1, fits[li].Item2);
                 lanes[li].parent = inner;
+                st.laneOf[li] = lanes[li];
+                st.SetLaneFit(li, fits[li].Item1, fits[li].Item2);
             }
             int unit = chars.Count + 1;
             int spinCount = settings.ObiSpinCount;
@@ -152,7 +154,7 @@ namespace PachiMoji
             {
                 if (settings.ObiGlow != ObiGlow.None)
                 {
-                    var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW * settings.ObiGlowWidth, lane.loop, lane.speed, lane.dir, lane.parent);
+                    var fire = ObiBand.Build(lane.pts, lane.len, lane.camLocal, ObiPlan.BandW * settings.ObiGlowWidth, lane.loop, lane.speed, lane.dir, lane.parent);
                     fire.SetFloat("_Intensity", fire.GetFloat("_Intensity") * settings.ObiGlowBright);
                     fire.SetFloat("_Gold", settings.ObiGlow == ObiGlow.Gold ? 1 : 0);
                     st.fires.Add(fire);
@@ -287,7 +289,11 @@ namespace PachiMoji
             if (laneOuter[lane] == null) return;
             laneOuter[lane].localPosition = lanePivot[lane] + (Vector3)EffectSettings.ClampObiOffset(offset);
             laneOuter[lane].localScale = Vector3.one * EffectSettings.ClampObiScale(scale);
+            // 列を動かしたら、カメラの向きもその列の中の座標で取り直す（取り直さないと、横へ動かしたとき字と光の向きがずれる）
+            if (laneOf[lane] != null && laneOf[lane].parent != null)
+                laneOf[lane].camLocal = laneOf[lane].parent.InverseTransformPoint(root.transform.TransformPoint(camPos));
         }
+        readonly Lane[] laneOf = new Lane[2];
 
         /// <summary>画面の縦の長さ（0〜1）を、帯の動く単位に直す倍率</summary>
         public float UnitsPerScreenHeight => 2 * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * -camPos.z;
@@ -372,7 +378,7 @@ namespace PachiMoji
                 if (L.t.gameObject.activeSelf != on) L.t.gameObject.SetActive(on);
                 if (!on) continue;
                 L.lane.At(s, out var p, out var tan);
-                ObiBand.Frame(p, tan, camPos, out var fwd, out var up);
+                ObiBand.Frame(p, tan, L.lane.camLocal, out var fwd, out var up);
                 L.t.localPosition = p + up * L.lift;
                 L.t.localRotation = Quaternion.LookRotation(fwd, L.flip ? -up : up);
             }
