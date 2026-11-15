@@ -77,16 +77,17 @@ namespace PachiMoji
             float maxH = 0.001f, refCy = 0;
             // 帯の文字は極太ゴシック（参考の帯の字）。その書体に無い字だけ、設定の書体で作る
             var band = PachiText.LoadFont(BandFont);
-            // 立体の形：厚みをとても深く、外のフチは細く（字の細さを保つ）
+            // 立体の形：参考の帯の字は、つるっとした金の面と細い面取りだけ（太いフチ・溝は無い）。厚みは深く
             var style = PachiTextBuilder.DefaultStyle();
-            style.sideProfile = new[] { new Vector2(0, 32), new Vector2(0, 1250) };
-            const float rimK = 0.6f;
-            style.silhouette *= rimK;
-            for (int r = 0; r < style.rimSteps.Length; r++)
+            style.sideProfile = new[] { new Vector2(0, 22), new Vector2(0, 520) };
+            style.steps = new[]
             {
-                var q = style.rimSteps[r];
-                style.rimSteps[r] = new PachiTextBuilder.Step(q.inner * rimK, q.zIn, q.outer * rimK, q.zOut, q.part);
-            }
+                new PachiTextBuilder.Step(-4, 0, 4, 4, PachiTextBuilder.Part.Line),    // 面のきわの細い明るい面取り
+                new PachiTextBuilder.Step(4, 4, 28, 22, PachiTextBuilder.Part.Rim),    // 太い金の斜面（字の線を太く見せる。参考の字の面取り）
+            };
+            style.silhouette = 28;
+            style.floorZ = 22;
+            style.rimSteps = new[] { new PachiTextBuilder.Step(-1, 22, 0, 22, PachiTextBuilder.Part.Rim) };   // 外のフチは付けない（形の都合で細い1段だけ）
             foreach (var ch in chars)
             {
                 if (templates.ContainsKey(ch)) continue;
@@ -94,7 +95,11 @@ namespace PachiMoji
                 var go = PachiText.Create(new[] { ch }, Tier.Gold, has ? BandFont : settings.FontName, style);
                 go.transform.SetParent(st.root.transform, false);
                 // 厚みを赤銅にする（表の面・フチは金のまま）
-                go.GetComponent<MeshRenderer>().sharedMaterials[4].SetTexture("_Ramp", PachiRamps.Get("obiSide"));
+                var gm = go.GetComponent<MeshRenderer>().sharedMaterials;
+                gm[4].SetTexture("_Ramp", PachiRamps.Get("obiSide"));
+                gm[4].SetFloat("_BackFade", 0.1f);    // 奥ほど暗い赤に沈める（小さいほど奥が暗い）
+                gm[2].SetTexture("_Ramp", PachiRamps.Get("obiFloor"));   // 字のすき間・きわ：黒ではなく深い赤茶
+                gm[2].SetFloat("_Boost", 1.2f);
                 Shear(go.GetComponent<PachiText.Rig>().mesh, ObiPlan.Slant);
                 var b = go.GetComponent<MeshRenderer>().bounds;
                 go.SetActive(false);
@@ -142,7 +147,7 @@ namespace PachiMoji
                 }
 
                 // 星のキラキラ：帯の上に散らして、文字といっしょに流しながら、ばらばらの間でまたたかせる
-                int starCount = Mathf.Max(3, Mathf.RoundToInt(lane.loop / 1.0f));
+                int starCount = Mathf.Max(2, Mathf.RoundToInt(lane.loop / 2.4f));
                 for (int j = 0; j < starCount; j++)
                 {
                     var holder = new GameObject("Star");
@@ -244,14 +249,14 @@ namespace PachiMoji
         }
 
         // 帯の文字の書体：明朝（細くて長い字。ユーザーの指定）。その書体に無い字だけ設定の書体
-        const string BandFont = "ZenOldMinchoBlack";
+        public static string BandFont = "ZenOldMinchoBlack";
         /// <summary>文字の後ろの光：なし（参考の帯。文字だけが列になって流れる）・金の光・炎</summary>
         public enum BandLook { None, Gold, Fire }
         public static BandLook Band = BandLook.None;
 
         // 文字の向き：上の列は下から見上げ（厚みが下・奥へ）、下の列は上から見下ろす（厚みが上・奥へ）。どちらも少し横を向けて厚みを見せる
-        static readonly Quaternion TopTurn = Quaternion.Euler(22, 24, 0);
-        static readonly Quaternion BottomTurn = Quaternion.Euler(-18, 24, 0);
+        static readonly Quaternion TopTurn = Quaternion.Euler(22, -24, 0);
+        static readonly Quaternion BottomTurn = Quaternion.Euler(-18, -24, 0);
 
         // 字を斜めにする：上へ行くほど x をずらす（立体の点を直接動かす。1文字の型ごとに1回だけ）
         static void Shear(Mesh mesh, float k)

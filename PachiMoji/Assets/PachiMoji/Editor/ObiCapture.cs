@@ -13,7 +13,7 @@ namespace PachiMoji.EditorTools
     /// </summary>
     public static class ObiCapture
     {
-        static readonly string[] Words = { "合格", "確定" };
+        static readonly string[] Words = { "緋弾", "覚醒" };   // 参考の帯と同じ言葉で見比べる
 
         public static void Run()
         {
@@ -26,6 +26,10 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_9x19.png"), 1080, 2340, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_9x16.png"), 1080, 1920, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_photo_9x16.png"), 1080, 1920, 2, 0, settings, true);
+                // 書体の見比べ（ポップ＝Reggae One）
+                ObiStage.BandFont = "ReggaeOne";
+                Shoot(Path.Combine(outDir, "obi_cmp_reggae.png"), 1080, 2340, 2, 0, settings, false);
+                ObiStage.BandFont = "ZenOldMinchoBlack";
                 // 文字の後ろの光の見比べ（ふつうは「なし」）
                 ObiStage.Band = ObiStage.BandLook.Fire;
                 Shoot(Path.Combine(outDir, "obi_cmp_fire.png"), 1080, 1920, 2, 0, settings, true);
