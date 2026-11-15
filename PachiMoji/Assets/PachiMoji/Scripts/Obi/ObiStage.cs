@@ -74,12 +74,19 @@ namespace PachiMoji
                 else chars.Add(word[i].ToString());
             }
             var templates = new Dictionary<string, (GameObject go, Vector3 c)>();
+            Material[] hotMats = null;
             float maxH = 0.001f, refCy = 0;
             foreach (var ch in chars)
             {
                 if (templates.ContainsKey(ch)) continue;
                 var go = PachiText.Create(new[] { ch }, Tier.Gold, settings.FontName);
                 go.transform.SetParent(st.root.transform, false);
+                // 塗りを「焼けた金・赤い縁・赤い厚み」に替える（王道昇格の黒い縁どりの金とは別の塗り）
+                var mr = go.GetComponent<MeshRenderer>();
+                foreach (var old in mr.sharedMaterials) Kill(old);
+                hotMats ??= HotMaterials();
+                mr.sharedMaterials = hotMats;
+                go.GetComponent<PachiText.Rig>().mats = hotMats;
                 var b = go.GetComponent<MeshRenderer>().bounds;
                 go.SetActive(false);
                 templates[ch] = (go, new Vector3(b.center.x, b.center.y, b.min.z));
@@ -94,49 +101,26 @@ namespace PachiMoji
                 st.MakeLane(ObiPlan.ArcPoints(ObiPlan.BottomFor(aspect), false, 600), +1, halfW, halfH, dist, chars.Count),
             };
             int unit = chars.Count + 1;
-            // 飾りの型と材質（どの飾りも同じものを使い回す）
-            var faceMat = ObiOrnament.Metal("goldRim", 3.2f);
-            var sideMat = ObiOrnament.Metal("goldSide", 1.5f, true);
-            var flameBig = ObiOrnament.Flame(0.30f, 0.30f, 0.06f);
-            var flameSmall = ObiOrnament.Flame(0.20f, 0.17f, 0.05f);
-            var diamond = ObiOrnament.Diamond(0.52f, 0.62f, 0.10f);
             foreach (var lane in lanes)
             {
-                ObiBand.Build(lane.pts, st.camPos, ObiPlan.BandW, st.root.transform);
+                st.fires.Add(ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW, lane.loop, lane.speed, lane.dir, st.root.transform));
                 int slots = Mathf.RoundToInt(lane.loop / ObiPlan.Spacing);
                 for (int k = 0; k < slots; k++)
                 {
                     int ci = k % unit;
-                    if (ci == chars.Count)
-                    {
-                        // 言葉と言葉のあいだの区切り：金の菱形
-                        var dia = st.Ornament("Diamond", diamond, faceMat, sideMat);
-                        st.letters.Add((dia.transform, lane, k * ObiPlan.Spacing, 0, false));
-                        continue;
-                    }
+                    if (ci == chars.Count) continue;   // 言葉と言葉のあいだ（炎だけ）
                     var tp = templates[chars[ci]];
                     var holder = new GameObject("Letter");
                     holder.transform.SetParent(st.root.transform, false);
                     var copy = Object.Instantiate(tp.go, holder.transform);
                     copy.SetActive(true);
-                    copy.transform.localScale = Vector3.one * scale;
-                    copy.transform.localPosition = -new Vector3(tp.c.x, refCy, tp.c.z) * scale;
+                    copy.transform.localScale = new Vector3(scale * ObiPlan.Squeeze, scale, scale);
+                    copy.transform.localPosition = -new Vector3(tp.c.x * scale * ObiPlan.Squeeze, refCy * scale, tp.c.z * scale);
                     // 角のキラッは4文字に1つだけ
                     var rig = copy.GetComponent<PachiText.Rig>();
                     for (int g = 0; g < rig.glints.Count; g++) rig.glints[g].gameObject.SetActive(k % 4 == 0 && g == 0);
                     st.letters.Add((holder.transform, lane, k * ObiPlan.Spacing, 0, false));
                 }
-
-                // 縁からはみ出す炎の飾り（上の縁・下の縁。大小をかわりばんこに）。文字といっしょに流れる
-                int teeth = Mathf.Max(4, Mathf.RoundToInt(lane.loop / FlameStep));
-                float step = lane.loop / teeth;
-                float edge = ObiPlan.BandW * 0.5f - 0.03f;
-                foreach (bool lower in new[] { false, true })
-                    for (int j = 0; j < teeth; j++)
-                    {
-                        var f = st.Ornament("Flame", j % 2 == 0 ? flameBig : flameSmall, faceMat, sideMat);
-                        st.letters.Add((f.transform, lane, j * step + (lower ? step / 2 : 0), lower ? -edge : edge, lower));
-                    }
             }
 
             // 写真：帯の奥に、書き出しの枠（9:16）を覆う板
@@ -208,19 +192,25 @@ namespace PachiMoji
             return lane;
         }
 
-        const float FlameStep = 0.42f;   // 縁の飾りの間隔の目安
-
-        GameObject Ornament(string name, Mesh mesh, Material face, Material side)
+        // 文字の材質（サブメッシュ順：表の面・細い線・きわの溝・外フチ・側面）
+        static Material[] HotMaterials()
         {
-            var go = new GameObject(name);
-            go.transform.SetParent(root.transform, false);
-            go.AddComponent<MeshFilter>().sharedMesh = mesh;
-            go.AddComponent<MeshRenderer>().sharedMaterials = new[] { face, side };
-            return go;
+            Material M(string ramp, float boost, bool side = false)
+            {
+                var m = new Material(Shader.Find("PachiMoji/Metal"));
+                m.SetTexture("_Ramp", PachiRamps.Get(ramp));
+                m.SetFloat("_Boost", boost);
+                if (side) { m.SetFloat("_Horizon", -0.7f); m.SetFloat("_Diffuse", 0.5f); }
+                return m;
+            }
+            return new[] { M("hot", 2.6f), M("hotLine", 3f), M("hotGroove", 1.2f), M("hotRim", 2.2f), M("hotSide", 1.4f, true) };
         }
+
+        readonly List<Material> fires = new List<Material>();   // 帯の炎（時刻を入れて流す）
 
         public void Evaluate(float t)
         {
+            foreach (var f in fires) f.SetFloat("_T", t);
             foreach (var L in letters)
             {
                 float s = ObiPlan.SlotPos(L.s0, L.lane.dir, L.lane.speed, t, L.lane.loop, L.lane.Total);

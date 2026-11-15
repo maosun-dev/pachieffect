@@ -29,6 +29,16 @@ namespace PachiMoji
                 (0.65f, "#c8d0dc"), (0.75f, "#eef2f8"), (0.82f, "#9aa4b4"), (0.9f, "#f4f8ff"), (1f, "#ffffff") },
             ["silverLine"] = new[] { (0f, "#101420"), (0.4f, "#8a96b0"), (0.75f, "#f0f4ff"), (1f, "#ffffff") },
             ["silverSide"] = new[] { (0f, "#020308"), (0.3f, "#10142a"), (0.55f, "#4a5878"), (0.75f, "#a8b4cc"), (1f, "#ffffff") },
+            // 激アツの帯の文字（焼けた金）：面は黄〜濃い金に、白く焼けた帯が1本。黒や焦げ茶は使わない
+            ["hot"] = new[] { (0f, "#c23a00"), (0.12f, "#e86400"), (0.3f, "#ff9a00"), (0.45f, "#ffc400"), (0.58f, "#ffe030"),
+                (0.68f, "#fffbd0"), (0.76f, "#ffffff"), (0.84f, "#ffe860"), (0.92f, "#ffd000"), (1f, "#fff6c0") },
+            ["hotLine"] = new[] { (0f, "#ff7a00"), (0.4f, "#ffd020"), (0.8f, "#fff6b0"), (1f, "#ffffff") },
+            // 字のすき間の床・きわ：橙（赤黒くすると字の中が重くなる）
+            ["hotGroove"] = new[] { (0f, "#b02a00"), (0.4f, "#e85000"), (0.75f, "#ff8a00"), (1f, "#ffd060") },
+            // 外フチ：赤〜橙
+            ["hotRim"] = new[] { (0f, "#6a0000"), (0.3f, "#b80c00"), (0.55f, "#ee2a00"), (0.75f, "#ff6a00"), (0.9f, "#ffb030"), (1f, "#fff0a0") },
+            // 側面（厚み）：濃い赤
+            ["hotSide"] = new[] { (0f, "#2a0000"), (0.3f, "#6e0000"), (0.55f, "#b00a00"), (0.78f, "#e83000"), (1f, "#ff8a40") },
         };
 
         static readonly Dictionary<string, Texture2D> cache = new Dictionary<string, Texture2D>();

@@ -31,7 +31,7 @@ namespace PachiMoji.EditorTools
         public const int WatermarkW = 640, WatermarkH = 128;
         // Shader.Find で探すだけのシェーダーは、ここに並べて「いつも入れる」にしないとアプリから抜け落ちる
         public static readonly string[] Shaders =
-            { "PachiMoji/Burst", "PachiMoji/Flash", "PachiMoji/Glint", "PachiMoji/Metal", "PachiMoji/Rays", "PachiMoji/Spark", "PachiMoji/Photo", "PachiMoji/Shade" };
+            { "PachiMoji/Burst", "PachiMoji/Flash", "PachiMoji/Glint", "PachiMoji/Metal", "PachiMoji/Rays", "PachiMoji/Spark", "PachiMoji/Photo", "PachiMoji/FireBand" };
         const string GraphicsSettingsPath = "ProjectSettings/GraphicsSettings.asset";
         public const string AdsSettingsPath = "Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset";
         public const string ProductionDefine = "PACHI_PRODUCTION";
