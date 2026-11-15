@@ -147,8 +147,14 @@ jobs:
       # ここでは署名しない（署名すると開発用の証明書が要り、それには iPhone の登録が要る）。
       # 配布用の署名は次の「TestFlight に送る」で付ける。
       # 広告の部品（Google Mobile Ads）は CocoaPods で取ってくる。Linux 機では入れられないので、ここで入れる
+      # 部品の一覧は、GitHub の Specs を丸ごと取らず、CDN（必要な分だけ）から取る。丸ごとだと毎回 16〜27 分かかっていた
       - name: 広告の部品を取ってくる（pod install）
-        run: cd iOS && pod install --repo-update
+        run: |
+          cd iOS
+          # Specs の行を CDN に置き換える（行が無ければ先頭に足す）
+          ruby -e 's = File.read("Podfile"); s.gsub!(%r{source\s+.https://github\.com/CocoaPods/Specs(\.git)?.}, "source %q(https://cdn.cocoapods.org/)"); s = "source %q(https://cdn.cocoapods.org/)\n" + s unless s.include?("cdn.cocoapods.org"); File.write("Podfile", s)'
+          echo "----- Podfile -----"; head -5 Podfile
+          pod install
 
       # 日本語の言語フォルダ（ja.lproj）をアプリに入れる。App Store はアプリの中の言語フォルダで対応言語を決める。
       # Xcode の作りの書き換えには、CocoaPods に付いてくる xcodeproj を使う
