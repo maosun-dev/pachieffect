@@ -301,6 +301,10 @@ namespace PachiMoji
         /// <summary>作ったものを全部消す（PachiRamps の色表と Quad の共有メッシュは消さない）</summary>
         public void Dispose()
         {
+            // アプリの中では Destroy はこのコマの終わりまで待つので、先に見えなくする。
+            // （書き出しを始めるとき、片づけた画面の帯が書き出しの最初の 2 コマに二重に写っていた）
+            if (root != null) root.SetActive(false);
+            if (volumeGo != null) volumeGo.SetActive(false);
             if (root != null)
             {
                 var mats = new HashSet<Material>();

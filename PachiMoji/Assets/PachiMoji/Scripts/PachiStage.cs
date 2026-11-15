@@ -203,6 +203,9 @@ namespace PachiMoji
                 foreach (var rg in r.GetComponentsInChildren<PachiText.Rig>(true))
                     if (rg.mesh != null) meshes.Add(rg.mesh);
             }
+            // アプリの中では Destroy はこのコマの終わりまで待つので、先に見えなくする（書き出しの最初のコマに残らないように）
+            foreach (var r in roots) if (r != null) r.SetActive(false);
+            if (volumeGo != null) volumeGo.SetActive(false);
             foreach (var r in roots) Kill(r);
             foreach (var m in mats) Kill(m);
             foreach (var m in meshes) Kill(m);
