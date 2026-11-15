@@ -10,7 +10,7 @@ Shader "PachiMoji/FireBand"
         _Speed ("Speed", Float) = 1.6
         _Dir ("Direction", Float) = 1
         _Cell ("Noise Cell", Float) = 0.55
-        _Intensity ("Intensity", Float) = 1.35
+        _Intensity ("Intensity", Float) = 1.0
         _HalfW ("Band Half Width (world)", Float) = 0.675
         _Gold ("Gold Light (0 fire / 1 gold)", Float) = 0
     }
@@ -68,7 +68,7 @@ Shader "PachiMoji/FireBand"
                 float fine = fbm(float2((u2 - lean * 1.6) / _Loop * n * 2, y * 1.7 + 7.7), n * 2);
                 float flame = big * 0.55 + fine * 0.32 + streak * 0.33;
                 // 熱さ：まん中ほど熱く、外へ行くほど炎の舌の先だけ残る
-                float heat = flame * 1.6 - reach * 1.15 - 0.03;
+                float heat = flame * 1.45 - reach * 1.35 - 0.06;   // 炎の量（大きいほど炎が広がる）
                 // 色：ふちは赤、すぐ橙〜黄。まん中は黄が主役で、筋のところだけ白く焼ける
                 float3 red = float3(1.0, 0.1, 0.0), orange = float3(1.0, 0.42, 0.0), yellow = float3(1.0, 0.84, 0.12), white = float3(1.0, 0.98, 0.78);
                 float3 col = lerp(red, orange, smoothstep(0.0, 0.13, heat));
@@ -85,10 +85,10 @@ Shader "PachiMoji/FireBand"
                     float shimmer = 0.55 + 0.45 * streak + 0.25 * fine;
                     float3 deep = float3(0.85, 0.42, 0.02), gold = float3(1.0, 0.74, 0.16), pale = float3(1.0, 0.95, 0.7);
                     float3 g = lerp(deep, gold, saturate(shimmer * 1.1));
-                    float line = smoothstep(0.66, 0.84, streak);
-                    g = lerp(g, pale, line);
+                    float glint = smoothstep(0.66, 0.84, streak);   // （line は HLSL の予約語なので使わない）
+                    g = lerp(g, pale, glint);
                     alpha = soft * (0.34 + 0.3 * shimmer);
-                    outc = g * alpha * 1.15 + pale * line * soft * 0.7;
+                    outc = g * alpha * 1.15 + pale * glint * soft * 0.7;
                     // 帯のふちに細い金の線（上下）
                     float edge = exp(-pow((abs(y) - 1.02) / 0.035, 2));
                     outc += float3(1.0, 0.86, 0.4) * edge * 1.4;

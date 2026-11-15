@@ -37,6 +37,8 @@ namespace PachiMoji.EditorTools
                 Expect(PlayerSettings.defaultInterfaceOrientation == UIOrientation.Portrait, "縦向き固定");
                 Expect(EditorBuildSettings.scenes.Length == 1 && EditorBuildSettings.scenes[0].path == PachiBuild.PlayScene, "入れるシーンは Play だけ");
                 foreach (var s in PachiBuild.Shaders) Expect(PachiBuild.AlwaysIncluded(s), "いつも入れるシェーダー: " + s);
+                // 材質がコンパイルできている（失敗するとピンク一色になる。予約語 line を使って壊れたことがある）
+                foreach (var s in PachiBuild.Shaders) { var sh = Shader.Find(s); Expect(sh != null && !ShaderUtil.ShaderHasError(sh), "シェーダーにエラーがない: " + s); }
                 var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(PachiBuild.IconPath);
                 Expect(icon != null && icon.width == 1024 && icon.height == 1024, "アイコン 1024 四方");
                 // CreatePrimitive(Quad) が付ける MeshCollider を、iPhone 版の「使わない部品を削る」から守る

@@ -30,7 +30,7 @@ namespace PachiMoji
             mat.SetFloat("_Dir", dir);
             mat.SetFloat("_HalfW", bandW * 0.5f);
             float hw = bandW * 0.5f * FireWidth;
-            const float back = 0.15f;   // 文字の表の面より少し奥（文字が炎の手前に立つ）
+            const float back = 1.6f;    // 文字の厚み（傾けた分も入れて）より奥。光が字にかぶらないように
 
             var verts = new List<Vector3>();
             var uvs = new List<Vector2>();
