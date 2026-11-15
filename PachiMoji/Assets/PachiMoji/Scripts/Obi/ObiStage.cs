@@ -42,7 +42,8 @@ namespace PachiMoji
         readonly List<(Transform t, Lane lane, float s0, float lift, bool flip)> letters = new List<(Transform, Lane, float, float, bool)>();
         Vector3 camPos;
 
-        public static ObiStage Build(string[] lines, float aspect, EffectSettings settings, Texture2D photo)
+        /// <param name="photo">背景の写真（動画のときは null で、mediaPending を true にして、あとで SetMedia で板を渡す）</param>
+        public static ObiStage Build(string[] lines, float aspect, EffectSettings settings, Texture photo, bool mediaPending = false)
         {
             var st = new ObiStage();
             settings ??= new EffectSettings();
@@ -207,18 +208,18 @@ namespace PachiMoji
                 // ブルーバック：背景は青一色（写真・模様は出さない。動画編集で青を抜いて重ねる）
                 st.cam.backgroundColor = BlueBack;
             }
-            else if (photo != null)
+            else if (photo != null || mediaPending)
             {
                 var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 Object.DestroyImmediate(q.GetComponent<Collider>());
                 q.name = "Photo";
                 q.transform.SetParent(st.root.transform, false);
-                var m = new Material(Shader.Find("PachiMoji/Photo"));
-                m.SetTexture("_MainTex", photo);
-                q.GetComponent<MeshRenderer>().sharedMaterial = m;
+                st.photoMat = new Material(Shader.Find("PachiMoji/Photo"));
+                q.GetComponent<MeshRenderer>().sharedMaterial = st.photoMat;
                 st.photoQuad = q.transform;
-                st.photoAspect = (float)photo.width / photo.height;
-                st.SetPhotoFit(settings.PhotoOffset, settings.PhotoZoom);
+                st.photoOffset = settings.PhotoOffset; st.photoZoom = settings.PhotoZoom;
+                // 動画は準備ができるまで黒（縦長の枠と同じ形）
+                st.SetMedia(photo, photo != null ? (float)photo.width / photo.height : PhotoFit.FrameAspect);
             }
             else
             {
@@ -251,9 +252,22 @@ namespace PachiMoji
             return st;
         }
 
+        Material photoMat;
+        Vector2 photoOffset; float photoZoom = 1;
+
+        /// <summary>背景の絵（写真・動画の板）を差し替える。aspect は横÷縦</summary>
+        public void SetMedia(Texture tex, float aspect)
+        {
+            if (photoMat == null) return;
+            photoMat.SetTexture("_MainTex", tex != null ? tex : Texture2D.blackTexture);
+            photoAspect = aspect;
+            SetPhotoFit(photoOffset, photoZoom);
+        }
+
         /// <summary>写真のずらし・倍率を変える（組み立て直さずに写真の板だけ動かす）</summary>
         public void SetPhotoFit(Vector2 offset, float zoom)
         {
+            photoOffset = offset; photoZoom = zoom;
             if (photoQuad == null) return;
             var size = PhotoFit.Size(photoAspect, zoom, frameAspect) * frameW;
             var off = PhotoFit.ClampOffset(offset, photoAspect, zoom, frameAspect) * frameW;
@@ -391,7 +405,7 @@ namespace PachiMoji
                 foreach (var c in profile.components) Kill(c);
                 Kill(profile);
             }
-            root = null; volumeGo = null; profile = null; cam = null; photoQuad = null; back = null;
+            root = null; volumeGo = null; profile = null; cam = null; photoQuad = null; photoMat = null; back = null;
             letters.Clear(); fires.Clear(); stars.Clear(); spins.Clear();
         }
 

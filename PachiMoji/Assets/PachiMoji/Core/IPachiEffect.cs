@@ -13,6 +13,8 @@ namespace PachiMoji
         void Evaluate(float t);                                             // 時刻 t の姿にする（状態を持たない）
         void Idle(float t);                                                 // 入力を待っているあいだの姿（仕様書の形に足したもの）
         Camera Camera { get; }                                              // 描くカメラ
+        bool Ready { get; }                                                 // 書き出しで、今のコマを描いてよいか（背景の動画が合うのを待つ）
+        void SetExporting(bool on);                                         // 書き出し中か（動画は1コマずつ合わせ、音を消す）
         void Dispose();                                                     // 片付ける
     }
 }

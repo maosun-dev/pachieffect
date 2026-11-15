@@ -14,6 +14,7 @@ namespace PachiMoji
         [DllImport("__Internal")] static extern int PachiVideo_Begin(string path, int w, int h, int fps, int bitRate);
         [DllImport("__Internal")] static extern unsafe int PachiVideo_Append(void* bgra, int frame);
         [DllImport("__Internal")] static extern void PachiVideo_Finish();
+        [DllImport("__Internal")] static extern void PachiVideo_SetAudio(string path, double start, double duration);
         [DllImport("__Internal")] static extern int PachiVideo_Poll();
         [DllImport("__Internal")] static extern int PachiVideo_LastError();
         [DllImport("__Internal")] static extern void PachiVideo_Cancel();
@@ -26,6 +27,8 @@ namespace PachiMoji
         // コマの中身は写さず、場所だけを渡す（1コマ 8MB あるため）
         public unsafe WriteResult Append(NativeArray<byte> bgra, int frame) =>
             (WriteResult)PachiVideo_Append(NativeArrayUnsafeUtility.GetUnsafeReadOnlyPtr(bgra), frame);
+
+        public void SetAudio(string path, float start, float duration) => PachiVideo_SetAudio(path, start, duration);
 
         public void Finish() => PachiVideo_Finish();
 

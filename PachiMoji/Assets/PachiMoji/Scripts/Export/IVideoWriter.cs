@@ -11,6 +11,7 @@ namespace PachiMoji
         long FreeBytes(string dir);                              // その場所の空き容量
         ExportError Begin(string path, int w, int h, int fps);   // 作りかけがあれば消してから始める
         WriteResult Append(NativeArray<byte> bgra, int frame);   // 1コマ（BGRA、下の行から）。Busy は次の Step でもう一度
+        void SetAudio(string path, float start, float duration); // 仕上げで、この動画の start 秒から duration 秒の音を重ねる（Begin のあと）
         void Finish();                                           // 仕上げを始める（終わりは Poll で待つ）
         FinishState Poll(out ExportError error);
         void Cancel();                                           // 止めて、作りかけを消す

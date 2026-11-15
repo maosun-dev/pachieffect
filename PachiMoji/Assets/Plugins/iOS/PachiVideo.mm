@@ -19,6 +19,8 @@ static int gW, gH, gFps;
 static int gLastFrame;        // 最後に渡したコマの番号（終わりの時刻を決める）
 static volatile int gState;   // 0 書いている・1 できた・2 失敗（FinishState と同じ）
 static volatile int gError;   // ExportError の数
+static NSString* gAudioPath;  // 仕上げで重ねる音の元の動画（無ければ nil）
+static double gAudioStart, gAudioDur;
 
 // 失敗の理由を見分ける：空き容量が無いのか、それ以外か
 static int PachiErrorOf(NSError* e)
@@ -45,6 +47,48 @@ static void PachiRemoveFile()
     if (gPath != nil) [[NSFileManager defaultManager] removeItemAtPath:gPath error:nil];
 }
 
+// 書き上げた動画（gPath）に、gAudioPath の gAudioStart 秒から gAudioDur 秒の音を重ねて置き換える。
+// 音が無い・失敗したときは、音の無いまま置いておく（書き出しそのものは失敗にしない）
+static void PachiMergeAudio(void (^done)(void))
+{
+    NSString* src = gAudioPath;
+    if (src == nil) { done(); return; }
+    AVURLAsset* v = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:gPath] options:nil];
+    AVURLAsset* a = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:src] options:nil];
+    AVAssetTrack* vt = [[v tracksWithMediaType:AVMediaTypeVideo] firstObject];
+    AVAssetTrack* at = [[a tracksWithMediaType:AVMediaTypeAudio] firstObject];
+    if (vt == nil || at == nil) { done(); return; }
+    AVMutableComposition* c = [AVMutableComposition composition];
+    CMTime dur = v.duration;
+    AVMutableCompositionTrack* cv = [c addMutableTrackWithMediaType:AVMediaTypeVideo preferredTrackID:kCMPersistentTrackID_Invalid];
+    [cv insertTimeRange:CMTimeRangeMake(kCMTimeZero, dur) ofTrack:vt atTime:kCMTimeZero error:nil];
+    CMTime as = CMTimeMakeWithSeconds(gAudioStart, 600);
+    CMTime room = CMTimeSubtract(a.duration, as);
+    CMTime ad = CMTimeMinimum(dur, CMTimeMinimum(room, CMTimeMakeWithSeconds(gAudioDur, 600)));
+    if (CMTimeCompare(ad, kCMTimeZero) > 0)
+    {
+        AVMutableCompositionTrack* ca = [c addMutableTrackWithMediaType:AVMediaTypeAudio preferredTrackID:kCMPersistentTrackID_Invalid];
+        [ca insertTimeRange:CMTimeRangeMake(as, ad) ofTrack:at atTime:kCMTimeZero error:nil];
+    }
+    NSString* tmp = [gPath stringByAppendingString:@".audio.mp4"];
+    [[NSFileManager defaultManager] removeItemAtPath:tmp error:nil];
+    AVAssetExportSession* ex = [[AVAssetExportSession alloc] initWithAsset:c presetName:AVAssetExportPresetPassthrough];
+    if (ex == nil) { done(); return; }
+    ex.outputURL = [NSURL fileURLWithPath:tmp];
+    ex.outputFileType = AVFileTypeMPEG4;
+    NSString* out = gPath;
+    [ex exportAsynchronouslyWithCompletionHandler:^{
+        NSFileManager* fm = [NSFileManager defaultManager];
+        if (ex.status == AVAssetExportSessionStatusCompleted)
+        {
+            [fm removeItemAtPath:out error:nil];
+            [fm moveItemAtPath:tmp toPath:out error:nil];
+        }
+        else [fm removeItemAtPath:tmp error:nil];
+        done();
+    }];
+}
+
 static void PachiReplySaved(NSString* result)
 {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -68,6 +112,7 @@ extern "C"
         gPath = [NSString stringWithUTF8String:path];
         gW = w; gH = h; gFps = fps;
         gState = 0; gError = ErrNone; gLastFrame = -1;
+        gAudioPath = nil;
         PachiRemoveFile();
 
         NSError* err = nil;
@@ -136,6 +181,13 @@ extern "C"
         return 0;
     }
 
+    // 仕上げで重ねる音（Begin のあとに呼ぶ）
+    void PachiVideo_SetAudio(const char* path, double start, double duration)
+    {
+        gAudioPath = path != NULL ? [NSString stringWithUTF8String:path] : nil;
+        gAudioStart = start; gAudioDur = duration;
+    }
+
     void PachiVideo_Finish(void)
     {
         if (gWriter == nil) { gError = ErrWriteFailed; gState = 2; return; }
@@ -144,7 +196,7 @@ extern "C"
         if (gLastFrame >= 0) [gWriter endSessionAtSourceTime:CMTimeMake(gLastFrame + 1, gFps)];
         AVAssetWriter* w = gWriter;
         [w finishWritingWithCompletionHandler:^{
-            if (w.status == AVAssetWriterStatusCompleted) gState = 1;
+            if (w.status == AVAssetWriterStatusCompleted) PachiMergeAudio(^{ gState = 1; });
             else { gError = PachiErrorOf(w.error); gState = 2; }
         }];
     }

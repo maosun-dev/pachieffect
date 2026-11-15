@@ -26,6 +26,7 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_9x19.png"), 1080, 2340, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_9x16.png"), 1080, 1920, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_photo_9x16.png"), 1080, 1920, 2, 0, settings, true);
+                ShootVideo(outDir);
                 // 帯の選びの見比べ：厚み（うすい・やや薄い・ふつう。厚いが既定）、奥の赤み（少し・強い）、後ろの光（金の光・炎）
                 foreach (var d in new[] { ObiDepth.Thin, ObiDepth.Low, ObiDepth.Mid })
                     Shoot(Path.Combine(outDir, $"obi_depth_{d}.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiDepth = d }, false);
@@ -104,6 +105,42 @@ namespace PachiMoji.EditorTools
             st.Dispose();
             if (photo != null) UnityEngine.Object.DestroyImmediate(photo);
             Debug.Log($"[ObiCapture] saved {Path.GetFileName(file)} t={t}");
+        }
+
+        // 背景の動画（captures/test_video.mp4）：準備ができるまでエディタを回して待ち、2 秒目の帯を撮る
+        static void ShootVideo(string outDir)
+        {
+            string src = Path.Combine(outDir, "test_video.mp4");
+            if (!File.Exists(src)) { Debug.Log("[ObiCapture] 動画の確かめは飛ばした（test_video.mp4 が無い）"); return; }
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var fx = new ObiEffect();
+            fx.Build(Words, 9f / 16, new EffectSettings { EffectId = "obi", PhotoPath = src, VideoStart = 1, VideoEnd = 5 });
+            fx.SetExporting(true);
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            bool ok = false;
+            while (sw.ElapsedMilliseconds < 15000)
+            {
+                fx.Evaluate(2f);
+                if (fx.Ready && fx.VideoLength > 0) { ok = true; break; }
+                EditorApplication.Step();
+                System.Threading.Thread.Sleep(20);
+            }
+            Debug.Log($"[ObiCapture] 動画 ready={ok} 長さ={fx.VideoLength:F2} 区間の長さ={fx.Duration:F2}");
+            int w = 540, h = 960;
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            fx.Camera.targetTexture = rt;
+            fx.Camera.Render();
+            RenderTexture.active = rt;
+            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            tex.Apply();
+            RenderTexture.active = null;
+            File.WriteAllBytes(Path.Combine(outDir, "obi_video.png"), tex.EncodeToPNG());
+            fx.Camera.targetTexture = null;
+            rt.Release();
+            UnityEngine.Object.DestroyImmediate(tex);
+            UnityEngine.Object.DestroyImmediate(rt);
+            fx.Dispose();
         }
     }
 }

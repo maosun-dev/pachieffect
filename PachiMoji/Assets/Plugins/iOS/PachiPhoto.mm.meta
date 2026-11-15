@@ -30,7 +30,7 @@ PluginImporter:
         AddToEmbeddedBinaries: false
         CPU: AnyCPU
         CompileFlags: -fobjc-arc
-        FrameworkDependencies: PhotosUI;ImageIO;
+        FrameworkDependencies: PhotosUI;ImageIO;AVFoundation;CoreMedia;
   userData:
   assetBundleName:
   assetBundleVariant:

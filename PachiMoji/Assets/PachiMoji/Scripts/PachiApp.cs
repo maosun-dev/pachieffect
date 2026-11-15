@@ -60,6 +60,7 @@ namespace PachiMoji
             stage = new StageScreen(ui, uiCam);
             photoUi = PhotoAdjustView.Build(root, Screen.safeArea, ScreenPx, ui.StagePlayArea);
             photoUi.Moved += (o, z) => (stage.Effect as ObiEffect)?.SetPhotoFit(o, z);
+            photoUi.RangeChanged += (a, b) => (stage.Effect as ObiEffect)?.SetVideoRange(a, b);
             photoUi.Done.onClick.AddListener(PhotoDone);
             photoUi.Remove.onClick.AddListener(PhotoRemove);
             photoUi.Change.onClick.AddListener(PickPhoto);
@@ -134,6 +135,19 @@ namespace PachiMoji
 
             if (!stage.Visible) return;
             var fx = stage.Effect;
+            // 背景の動画の音：再生と終わりの画面だけ出す
+            if (fx is ObiEffect obiFx)
+            {
+                obiFx.Sound = state == AppState.Playing || state == AppState.Finished;
+                // 長さが分からなかった動画は、準備ができたら全体を使う
+                if (obiFx.HasVideo && settings.VideoEnd <= settings.VideoStart && obiFx.VideoLength > 0)
+                {
+                    settings.VideoEnd = obiFx.VideoLength;
+                    obiFx.SetVideoRange(settings.VideoStart, settings.VideoEnd);
+                    settings.Save();
+                    if (state == AppState.PhotoAdjust) photoUi.SetVideo(settings.VideoStart, settings.VideoEnd, obiFx.VideoLength);
+                }
+            }
             switch (state)
             {
                 case AppState.Idle:
@@ -314,7 +328,7 @@ namespace PachiMoji
         string BuildKey() =>
             string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
-            + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom
+            + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom + "|" + settings.VideoStart + "-" + settings.VideoEnd
             + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiBlueBack
             + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale + settings.ObiLayout + settings.ObiSpin;
 
@@ -420,14 +434,17 @@ namespace PachiMoji
         void PickPhoto()
         {
             if (state != AppState.Idle && state != AppState.PhotoAdjust) return;
-            PhotoPicker.Pick((r, path) =>
+            PhotoPicker.Pick((r, path, len) =>
             {
-                if (r == PhotoPickResult.Failed) { ui.Notice.text = "写真を読み込めませんでした。別の写真を選んでください"; return; }
+                if (r == PhotoPickResult.Failed) { ui.Notice.text = "写真・動画を読み込めませんでした。別のものを選んでください"; return; }
                 if (r != PhotoPickResult.Picked) return;
                 string old = settings.PhotoPath;
                 settings.PhotoPath = path;
                 settings.PhotoOffset = Vector2.zero;
                 settings.PhotoZoom = 1;
+                // 動画ははじめから全部を使う（長さが分からないときは 0。準備ができたら動画から決める）
+                settings.VideoStart = 0;
+                settings.VideoEnd = len;
                 settings.Save();
                 if (!string.IsNullOrEmpty(old) && old != path) PhotoStore.Delete(old);
                 Rebuild();
@@ -446,7 +463,11 @@ namespace PachiMoji
 
         void BeginPhotoAdjust()
         {
-            if (stage.Effect is ObiEffect obi) photoUi.Begin(settings.PhotoOffset, settings.PhotoZoom, obi.PhotoAspect);
+            if (stage.Effect is ObiEffect obi)
+            {
+                photoUi.Begin(settings.PhotoOffset, settings.PhotoZoom, obi.PhotoAspect);
+                photoUi.SetVideo(settings.VideoStart, settings.VideoEnd, obi.HasVideo ? Mathf.Max(obi.VideoLength, settings.VideoEnd) : 0);
+            }
         }
 
         void PhotoDone()
@@ -454,6 +475,7 @@ namespace PachiMoji
             if (state != AppState.PhotoAdjust) return;
             settings.PhotoOffset = photoUi.Offset;
             settings.PhotoZoom = photoUi.Zoom;
+            if (stage.Effect is ObiEffect obi && obi.HasVideo) { settings.VideoStart = photoUi.VideoStart; settings.VideoEnd = photoUi.VideoEnd; }
             settings.Save();
             ClosePhotoAdjust();
         }

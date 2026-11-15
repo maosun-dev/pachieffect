@@ -17,6 +17,15 @@ namespace PachiMoji
         public Button Change, Remove, Done;
         /// <summary>写真のずらし・倍率が変わったとき（PhotoFit で収めたあとの値）</summary>
         public event Action<Vector2, float> Moved;
+        /// <summary>動画の使う区間が変わったとき（はじめ・おわり、秒）</summary>
+        public event Action<float, float> RangeChanged;
+
+        // 動画の区間を選ぶつまみ（動画のときだけ出す）
+        RectTransform rangeBox, rail, fill, hStart, hEnd;
+        TMP_Text rangeLabel;
+        float vStart, vEnd, vLength;
+        public float VideoStart => vStart;
+        public float VideoEnd => vEnd;
 
         RectTransform panel, playArea, frame, dimTop, dimBottom;
         CanvasGroup group;
@@ -87,6 +96,31 @@ namespace PachiMoji
             m.Remove = MainScreen.PlateButton(bar, "写真を外す", mid, new Vector2(0, 0), new Vector2(116, 44), UiTheme.Body, 14, UiTheme.Chrome);
             m.Done = MainScreen.PlateButton(bar, "できた", mid, new Vector2(124, 0), new Vector2(116, 44), UiTheme.Display, 18, UiTheme.Gold);
 
+            // 動画の区間：下の帯のすぐ上に、細い金のレールと、はじめ・おわりの2つのつまみ
+            m.rangeBox = MainScreen.Rect(safe, "Range");
+            m.rangeBox.anchorMin = new Vector2(0, 0); m.rangeBox.anchorMax = new Vector2(1, 0);
+            m.rangeBox.pivot = new Vector2(0.5f, 0);
+            m.rangeBox.sizeDelta = new Vector2(0, 74);
+            m.rangeBox.anchoredPosition = new Vector2(0, UiTheme.BannerHeight + 76);
+            m.rangeBox.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.82f);
+            var lab = MainScreen.Rect(m.rangeBox, "Label");
+            MainScreen.Place(lab, new Vector2(0.5f, 1), new Vector2(0, -14), new Vector2(340, 20));
+            m.rangeLabel = MainScreen.Label(lab, "", UiTheme.Body, 12, UiTheme.Chrome);
+            m.rail = MainScreen.Rect(m.rangeBox, "Rail");
+            MainScreen.Place(m.rail, new Vector2(0.5f, 0), new Vector2(0, 24), new Vector2(300, 4));
+            var railImg = m.rail.gameObject.AddComponent<Image>();
+            railImg.color = new Color(UiTheme.Chrome.r, UiTheme.Chrome.g, UiTheme.Chrome.b, 0.35f);
+            railImg.raycastTarget = false;
+            m.fill = MainScreen.Rect(m.rail, "Fill");
+            m.fill.anchorMin = new Vector2(0, 0); m.fill.anchorMax = new Vector2(0, 1);
+            m.fill.pivot = new Vector2(0, 0.5f);
+            var fillImg = m.fill.gameObject.AddComponent<Image>();
+            fillImg.color = UiTheme.Gold;
+            fillImg.raycastTarget = false;
+            m.hStart = Handle(m.rail, "Start", f => m.DragHandle(true, f));
+            m.hEnd = Handle(m.rail, "End", f => m.DragHandle(false, f));
+            m.rangeBox.gameObject.SetActive(false);
+
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
             m.Show(false);
             return m;
@@ -104,6 +138,49 @@ namespace PachiMoji
         }
 
         /// <summary>合わせ始める（今のずらし・倍率と、写真の横÷縦）</summary>
+        // つまみ（押せる範囲は大きめ、見た目は金の丸）。f はレールの左端からの割合（0〜1）
+        static RectTransform Handle(RectTransform rail, string name, Action<float> drag)
+        {
+            var h = MainScreen.Rect(rail, name);
+            h.anchorMin = h.anchorMax = new Vector2(0, 0.5f);
+            h.sizeDelta = new Vector2(44, 44);
+            h.gameObject.AddComponent<Image>().color = Color.clear;
+            var dot = MainScreen.Rect(h, "Dot");
+            MainScreen.Place(dot, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(20, 20));
+            var img = dot.gameObject.AddComponent<Image>();
+            img.sprite = UiArt.Dot(UiTheme.Gold);
+            img.raycastTarget = false;
+            h.gameObject.AddComponent<RailHandle>().Drag = drag;
+            return h;
+        }
+
+        void DragHandle(bool isStart, float f)
+        {
+            float t = Mathf.Clamp01(f) * vLength;
+            if (isStart) SetRange(t, vEnd); else SetRange(vStart, t);
+            RangeChanged?.Invoke(vStart, vEnd);
+        }
+
+        /// <summary>動画の区間のつまみを出す（length は動画の長さ。0 なら出さない）</summary>
+        public void SetVideo(float start, float end, float length)
+        {
+            vLength = length;
+            rangeBox.gameObject.SetActive(length > 0);
+            if (length > 0) SetRange(start, end > start ? end : length);
+        }
+
+        void SetRange(float s, float e)
+        {
+            var r = VideoRange.Clamp(s, e, vLength);
+            vStart = r.start; vEnd = r.end;
+            float w = rail.rect.width > 0 ? rail.rect.width : 300;
+            hStart.anchoredPosition = new Vector2(vStart / vLength * w, 0);
+            hEnd.anchoredPosition = new Vector2(vEnd / vLength * w, 0);
+            fill.anchoredPosition = new Vector2(vStart / vLength * w, 0);
+            fill.sizeDelta = new Vector2((vEnd - vStart) / vLength * w, 0);
+            rangeLabel.text = $"使うところ　{vStart:0.0}秒 〜 {vEnd:0.0}秒（{vEnd - vStart:0.0}秒）";
+        }
+
         public void Begin(Vector2 offset, float zoom, float imgAspect)
         {
             this.imgAspect = imgAspect;
@@ -212,6 +289,19 @@ namespace PachiMoji
             int n = 0;
             foreach (var t in ts.touches) if (t.press.isPressed) n++;
             return n;
+        }
+    }
+
+    /// <summary>区間のつまみ：レールの上を横に動かす（f はレールの左端からの割合）</summary>
+    public class RailHandle : MonoBehaviour, IDragHandler
+    {
+        public Action<float> Drag;
+
+        public void OnDrag(PointerEventData e)
+        {
+            var rail = (RectTransform)transform.parent;
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(rail, e.position, e.pressEventCamera, out var p))
+                Drag?.Invoke((p.x - rail.rect.xMin) / Mathf.Max(1, rail.rect.width));
         }
     }
 }

@@ -45,6 +45,9 @@ namespace PachiMoji
             }
         }
 
+        public void SetAudio(string path, float start, float duration) =>
+            Debug.Log($"[PngVideoWriter] 音は付けない（PNG の並び）: {path} {start:F2}+{duration:F2}");
+
         public void Finish() => DestroyTex();
 
         public FinishState Poll(out ExportError error)

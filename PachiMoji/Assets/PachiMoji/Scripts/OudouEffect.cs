@@ -10,6 +10,8 @@ namespace PachiMoji
         public void Build(string[] lines, float aspect, EffectSettings settings) => stage = PachiStage.Build(lines, aspect, settings);
         public float Duration => stage.End;
         public bool Loops => false;
+        public bool Ready => true;
+        public void SetExporting(bool on) { }
         public void Evaluate(float t) => stage.Evaluate(t);
         public void Idle(float t) => stage.Idle(t);
         public Camera Camera => stage.cam;

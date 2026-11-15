@@ -148,7 +148,7 @@ namespace PachiMoji
             m.effectGroup = m.EffectButton.gameObject.AddComponent<CanvasGroup>();
 
             // 舞台の左下：写真を入れる・合わせる（激アツの帯のときだけ）
-            m.PhotoButton = PlateButton(m.StageIdleArea, "写真を入れる", new Vector2(0, 0), new Vector2(84, 32), new Vector2(148, 40), UiTheme.Body, 14, UiTheme.Chrome);
+            m.PhotoButton = PlateButton(m.StageIdleArea, "写真・動画を入れる", new Vector2(0, 0), new Vector2(92, 32), new Vector2(164, 40), UiTheme.Body, 14, UiTheme.Chrome);
             m.photoLabel = m.PhotoButton.GetComponentInChildren<TMP_Text>();
             m.photoGroup = m.PhotoButton.gameObject.AddComponent<CanvasGroup>();
             // 舞台の右下：帯の位置と大きさを合わせる（激アツの帯のときだけ）
@@ -310,7 +310,7 @@ namespace PachiMoji
         public void SetPhotoButton(bool visible, bool hasPhoto)
         {
             photoOn = visible;
-            photoLabel.text = hasPhoto ? "写真を合わせる" : "写真を入れる";
+            photoLabel.text = hasPhoto ? "写真・動画を合わせる" : "写真・動画を入れる";
             Show(photoGroup, idleNow && photoOn);
             Show(bandGroup, idleNow && photoOn);
         }

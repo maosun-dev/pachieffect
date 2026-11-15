@@ -61,6 +61,7 @@ namespace PachiMoji
             var size = ExportPlan.Size(settings != null && settings.ExportWide);
             W = size.x; H = size.y;
             effect.Build(lines, (float)W / H, settings);
+            effect.SetExporting(true);
             Duration = effect.Duration;
             TotalFrames = ExportPlan.FrameCount(Duration, effect.Loops);
 
@@ -77,7 +78,10 @@ namespace PachiMoji
 
             started = true;
             var e = writer.Begin(OutputPath, W, H, ExportPlan.Fps);
-            return e == ExportError.None ? e : Fail(e);
+            if (e != ExportError.None) return Fail(e);
+            // 背景が動画なら、その区間の音を重ねる
+            if (effect is ObiEffect obi && obi.HasVideo) writer.SetAudio(obi.VideoPath, obi.VideoStart, Duration);
+            return e;
         }
 
         /// <summary>毎コマ呼ぶ：描く → 読み出しの終わったコマから順に書き手へ → 全部渡したら仕上げを待つ</summary>
@@ -99,7 +103,12 @@ namespace PachiMoji
             }
 
             for (int n = 0; n < MaxPerStep && rendered < TotalFrames && pending.Count + ready.Count < MaxInFlight; n++)
+            {
+                // 背景の動画がこのコマに合うまで待つ（次の Step でもう一度）
+                effect.Evaluate(ExportPlan.TimeOf(rendered, Duration));
+                if (!effect.Ready) break;
                 RenderFrame(rendered++);
+            }
 
             // 読み出しの終わったコマを、順に写しへ移す
             while (pending.Count > 0 && pending.Peek().req.done)

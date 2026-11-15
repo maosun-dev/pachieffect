@@ -296,8 +296,8 @@ namespace PachiMoji.EditorTools
                     Expect(ui.EffectButton.GetComponent<CanvasGroup>().interactable && !ui.PhotoButton.GetComponent<CanvasGroup>().interactable,
                         "王道昇格の待ち：演出のボタンを押せて、写真のボタンは無い"));
                 ShotMain(720, 1560, Path.Combine(outDir, "main_effect_obi.png"), "定時", "退社", AppState.Idle, ui =>
-                    Expect(ui.PhotoButton.GetComponent<CanvasGroup>().interactable && ui.PhotoButton.GetComponentInChildren<TMPro.TMP_Text>().text == "写真を入れる",
-                        "帯の待ち：写真を入れるボタン"), new EffectSettings { EffectId = "obi" });
+                    Expect(ui.PhotoButton.GetComponent<CanvasGroup>().interactable && ui.PhotoButton.GetComponentInChildren<TMPro.TMP_Text>().text == "写真・動画を入れる",
+                        "帯の待ち：写真・動画を入れるボタン"), new EffectSettings { EffectId = "obi" });
                 ShotMain(720, 1560, Path.Combine(outDir, "main_finished_obi.png"), "定時", "退社", AppState.Finished, ui =>
                     Expect(!ui.EffectButton.GetComponent<CanvasGroup>().interactable && !ui.PhotoButton.GetComponent<CanvasGroup>().interactable,
                         "終わりの画面では演出・写真のボタンは出ない"), new EffectSettings { EffectId = "obi" });
@@ -691,7 +691,7 @@ namespace PachiMoji.EditorTools
 
             Environment.SetEnvironmentVariable("PACHI_PHOTO", src);
             PhotoPickResult got = PhotoPickResult.Failed; string path = null;
-            PhotoPicker.Pick((r, p) => { got = r; path = p; });
+            PhotoPicker.Pick((r, p, _) => { got = r; path = p; });
             Environment.SetEnvironmentVariable("PACHI_PHOTO", null);
             Expect(got == PhotoPickResult.Picked && path != null && File.Exists(path), "写真を選ぶと端末の中に写る");
             var tex = PhotoStore.Load(path);
@@ -716,7 +716,7 @@ namespace PachiMoji.EditorTools
             Expect(PhotoStore.Load(broken) == null, "壊れた写真は読まない");
             Expect(PhotoStore.Load(Path.Combine(tmp, "none.jpg")) == null && PhotoStore.Load("") == null, "無い写真は読まない");
 
-            PhotoPicker.Pick((r, p) => got = r);
+            PhotoPicker.Pick((r, p, _) => got = r);
             Expect(got == PhotoPickResult.Cancelled, "選ぶ写真が無ければやめた扱い");
             DeleteDir(tmp);
         }
