@@ -5,6 +5,10 @@ namespace PachiMoji
     public enum LightColor { IceBlue, Gold, Red, Rainbow }   // プチュンの光の色：青白・金・赤・虹
     public enum LightSize { Small, Medium, Large }
     public enum TextFont { ReggaeOne, Mincho }
+    // 激アツの帯の選び：文字の厚み・厚みの奥の赤み・文字の後ろの光
+    public enum ObiDepth { Thin, Low, Mid, Full }   // 厚い（Full）が最大。そこから薄くできる
+    public enum ObiRed { None, Half, Strong }
+    public enum ObiGlow { None, Gold, Fire }
     /// <summary>演出の好み。端末（PlayerPrefs）に残し、再生にも書き出しにも同じように効く</summary>
     public class EffectSettings
     {
@@ -23,6 +27,14 @@ namespace PachiMoji
         public string PhotoPath = "";                 // 激アツの帯の背景の写真（端末の中に写したもの。空＝なし）
         public Vector2 PhotoOffset;                   // 写真のずらし（書き出しの枠の幅を 1 とする。PhotoFit）
         public float PhotoZoom = 1;                   // 写真の倍率（1〜4）
+        public ObiDepth ObiDepth = ObiDepth.Full;     // 激アツの帯：文字の厚み
+        public ObiRed ObiRed = ObiRed.None;           // 激アツの帯：厚みの奥の赤み
+        public ObiGlow ObiGlow = ObiGlow.None;        // 激アツの帯：文字の後ろの光（なし・金の光・炎）
+
+        /// <summary>帯の文字の厚み（字の高さ 1000 に対して）</summary>
+        public float ObiDepthValue => ObiDepth switch { ObiDepth.Thin => 150f, ObiDepth.Low => 300f, ObiDepth.Mid => 460f, _ => 620f };
+        /// <summary>帯の厚みの奥の赤み（0〜1）</summary>
+        public float ObiRedValue => ObiRed == ObiRed.Half ? 0.5f : ObiRed == ObiRed.Strong ? 1f : 0f;
 
         /// <summary>Resources/Fonts/ の書体の名前</summary>
         public string FontName => Font == TextFont.Mincho ? "ZenOldMinchoBlack" : "ReggaeOne";
@@ -55,6 +67,9 @@ namespace PachiMoji
             s.PhotoPath = PlayerPrefs.GetString(prefix + "photo", "");
             s.PhotoOffset = new Vector2(PlayerPrefs.GetFloat(prefix + "photoX", 0), PlayerPrefs.GetFloat(prefix + "photoY", 0));
             s.PhotoZoom = PhotoFit.ClampZoom(PlayerPrefs.GetFloat(prefix + "photoZoom", 1));
+            s.ObiDepth = (ObiDepth)Pick(prefix + "obiDepth", (int)d.ObiDepth, 3);
+            s.ObiRed = (ObiRed)Pick(prefix + "obiRed", (int)d.ObiRed, 2);
+            s.ObiGlow = (ObiGlow)Pick(prefix + "obiGlow", (int)d.ObiGlow, 2);
             return s;
         }
 
@@ -73,6 +88,9 @@ namespace PachiMoji
             PlayerPrefs.SetFloat(prefix + "photoX", PhotoOffset.x);
             PlayerPrefs.SetFloat(prefix + "photoY", PhotoOffset.y);
             PlayerPrefs.SetFloat(prefix + "photoZoom", PhotoZoom);
+            PlayerPrefs.SetInt(prefix + "obiDepth", (int)ObiDepth);
+            PlayerPrefs.SetInt(prefix + "obiRed", (int)ObiRed);
+            PlayerPrefs.SetInt(prefix + "obiGlow", (int)ObiGlow);
             PlayerPrefs.Save();
         }
 

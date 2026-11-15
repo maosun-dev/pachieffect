@@ -26,20 +26,13 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_9x19.png"), 1080, 2340, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_9x16.png"), 1080, 1920, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_photo_9x16.png"), 1080, 1920, 2, 0, settings, true);
-                // 厚みの長さの見比べ
-                foreach (float d in new[] { 420f, 900f })
-                {
-                    ObiStage.Depth = d;
-                    Shoot(Path.Combine(outDir, $"obi_depth_{d:0}.png"), 1080, 2340, 2, 0, settings, false);
-                }
-                ObiStage.Depth = 620;
-                // 厚みの奥の赤みの見比べ
-                foreach (float k in new[] { 0.5f, 1f })
-                {
-                    ObiStage.DeepRed = k;
-                    Shoot(Path.Combine(outDir, $"obi_red_{Mathf.RoundToInt(k * 100)}.png"), 1080, 2340, 2, 0, settings, false);
-                }
-                ObiStage.DeepRed = 0;
+                // 帯の選びの見比べ：厚み（うすい・やや薄い・ふつう。厚いが既定）、奥の赤み（少し・強い）、後ろの光（金の光・炎）
+                foreach (var d in new[] { ObiDepth.Thin, ObiDepth.Low, ObiDepth.Mid })
+                    Shoot(Path.Combine(outDir, $"obi_depth_{d}.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiDepth = d }, false);
+                Shoot(Path.Combine(outDir, "obi_red_half.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiRed = ObiRed.Half }, false);
+                Shoot(Path.Combine(outDir, "obi_red_strong.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiRed = ObiRed.Strong }, false);
+                Shoot(Path.Combine(outDir, "obi_glow_gold.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = ObiGlow.Gold }, true);
+                Shoot(Path.Combine(outDir, "obi_glow_fire.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = ObiGlow.Fire }, true);
                 foreach (float t in new[] { 0f, 2.5f, 5f, 7.5f, 10f })
                     Shoot(Path.Combine(outDir, $"obi_t{t:0.0}.png"), 540, 1170, 1, t, settings, false);
             }

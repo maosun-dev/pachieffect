@@ -79,7 +79,7 @@ namespace PachiMoji
             var band = PachiText.LoadFont(BandFont);
             // 立体の形：王道昇格と同じ金属の字（フチ・溝あり。ユーザー「金属感あるほうが好き」）。厚みを深く、外のフチは細く（字の細さを保つ）
             var style = PachiTextBuilder.DefaultStyle();
-            style.sideProfile = new[] { new Vector2(0, 32), new Vector2(0, Depth) };
+            style.sideProfile = new[] { new Vector2(0, 32), new Vector2(0, settings.ObiDepthValue) };
             const float rimK = 0.6f;
             style.silhouette *= rimK;
             for (int r = 0; r < style.rimSteps.Length; r++)
@@ -97,7 +97,7 @@ namespace PachiMoji
                 var gm = go.GetComponent<MeshRenderer>().sharedMaterials;
                 gm[4].SetTexture("_Ramp", PachiRamps.Get("obiSide"));
                 gm[4].SetColor("_DeepTint", new Color(1f, 0.1f, 0.02f));
-                gm[4].SetFloat("_DeepAmount", DeepRed);
+                gm[4].SetFloat("_DeepAmount", settings.ObiRedValue);
                 gm[2].SetTexture("_Ramp", PachiRamps.Get("obiFloor"));   // 字のすき間・きわ：黒ではなく深い赤茶
                 gm[2].SetFloat("_Boost", 1.2f);
                 Shear(go.GetComponent<PachiText.Rig>().mesh, ObiPlan.Slant);
@@ -121,10 +121,10 @@ namespace PachiMoji
             starMat.SetFloat("_Angle", 0.2f);
             foreach (var lane in lanes)
             {
-                if (Band != BandLook.None)
+                if (settings.ObiGlow != ObiGlow.None)
                 {
                     var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW, lane.loop, lane.speed, lane.dir, st.root.transform);
-                    fire.SetFloat("_Gold", Band == BandLook.Gold ? 1 : 0);
+                    fire.SetFloat("_Gold", settings.ObiGlow == ObiGlow.Gold ? 1 : 0);
                     st.fires.Add(fire);
                 }
                 int slots = Mathf.RoundToInt(lane.loop / ObiPlan.Spacing);
@@ -250,11 +250,6 @@ namespace PachiMoji
 
         // 帯の文字の書体：明朝（細くて長い字。ユーザーの指定）。その書体に無い字だけ設定の書体
         public static string BandFont = "ZenOldMinchoBlack";
-        /// <summary>文字の後ろの光：なし（参考の帯。文字だけが列になって流れる）・金の光・炎</summary>
-        public enum BandLook { None, Gold, Fire }
-        public static BandLook Band = BandLook.None;
-        /// <summary>文字の厚み（字の高さ 1000 に対して）と、厚みの奥の赤み（0＝なし〜1）。見比べ用に変えられる</summary>
-        public static float Depth = 620, DeepRed = 0;
 
         // 文字の向き：上の列は下から見上げ（厚みが下・奥へ）、下の列は上から見下ろす（厚みが上・奥へ）。どちらも少し横を向けて厚みを見せる
         static readonly Quaternion TopTurn = Quaternion.Euler(22, -24, 0);

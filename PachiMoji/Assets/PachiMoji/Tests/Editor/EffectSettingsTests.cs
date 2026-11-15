@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -180,6 +180,41 @@ namespace PachiMoji.Tests
             Assert.AreEqual(PhotoFit.MaxZoom, EffectSettings.Load(P).PhotoZoom);
             PlayerPrefs.SetFloat(P + "photoZoom", 0.2f);
             Assert.AreEqual(1f, EffectSettings.Load(P).PhotoZoom);
+        }
+
+        [Test]
+        public void 帯の選びの既定()
+        {
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(ObiDepth.Full, s.ObiDepth);
+            Assert.AreEqual(ObiRed.None, s.ObiRed);
+            Assert.AreEqual(ObiGlow.None, s.ObiGlow);
+            Assert.AreEqual(620f, s.ObiDepthValue);
+            Assert.AreEqual(0f, s.ObiRedValue);
+        }
+
+        [Test]
+        public void 帯の選びを保存して読み戻す()
+        {
+            new EffectSettings { ObiDepth = ObiDepth.Thin, ObiRed = ObiRed.Half, ObiGlow = ObiGlow.Fire }.Save(P);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(ObiDepth.Thin, s.ObiDepth);
+            Assert.AreEqual(ObiRed.Half, s.ObiRed);
+            Assert.AreEqual(ObiGlow.Fire, s.ObiGlow);
+            Assert.AreEqual(150f, s.ObiDepthValue);
+            Assert.AreEqual(0.5f, s.ObiRedValue);
+        }
+
+        [Test]
+        public void 帯の選びが範囲外なら既定()
+        {
+            PlayerPrefs.SetInt(P + "obiDepth", 9);
+            PlayerPrefs.SetInt(P + "obiRed", -1);
+            PlayerPrefs.SetInt(P + "obiGlow", 3);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(ObiDepth.Full, s.ObiDepth);
+            Assert.AreEqual(ObiRed.None, s.ObiRed);
+            Assert.AreEqual(ObiGlow.None, s.ObiGlow);
         }
     }
 }

@@ -82,6 +82,18 @@ namespace PachiMoji
                 i => settings.TeaseText = (Tier)i, TierTextColors());
             m.Choice(parent, ref y, "チラ見せの背景", TierNames7(), null, (int)settings.TeaseBack, 44,
                 i => settings.TeaseBack = (Tier)i, TierTextColors());
+            // 激アツの帯だけに効く項目（見出しで分ける）
+            y -= 14;
+            var obiHead = MainScreen.Rect(parent, "ObiHead");
+            MainScreen.Place(obiHead, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 30));
+            MainScreen.Label(obiHead, "激アツの帯", UiTheme.Display, 20, UiTheme.Gold).alignment = TextAlignmentOptions.Left;
+            y -= 42;
+            m.Choice(parent, ref y, "文字の厚み", new[] { "うすい", "薄め", "ふつう", "厚い" }, null, (int)settings.ObiDepth, 80,
+                i => settings.ObiDepth = (ObiDepth)i);
+            m.Choice(parent, ref y, "厚みの奥の赤み", new[] { "なし", "少し", "強い" }, null, (int)settings.ObiRed, 104,
+                i => settings.ObiRed = (ObiRed)i);
+            m.Choice(parent, ref y, "文字の後ろの光", new[] { "なし", "金の光", "炎" }, null, (int)settings.ObiGlow, 104,
+                i => settings.ObiGlow = (ObiGlow)i);
             content.sizeDelta = new Vector2(0, -y + 24);
 
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
