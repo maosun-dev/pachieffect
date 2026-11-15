@@ -44,8 +44,15 @@ namespace PachiMoji
         // 横幅を基準の画面と同じに保つので、縦が短い画面では見える高さが減る。その半分だけ帯を内へ寄せる
         static float Shrink(float aspect) => ViewH * (1 - BaseAspect / aspect) / 2;
 
-        public static ObiRing TopFor(float aspect) => Top.WithCenter(Top.Center - new Vector2(0, Shrink(aspect)));
-        public static ObiRing BottomFor(float aspect) => Bottom.WithCenter(Bottom.Center + new Vector2(0, Shrink(aspect)));
+        public static readonly float CamDist = ViewH * 0.5f / Mathf.Tan(Fov * 0.5f * Mathf.Deg2Rad);   // カメラから z=0 の面まで
+
+        // 帯の一番外側（上の帯の一番上は奥 z=+R cos、下の帯の一番下は手前 z=-R cos）が、画面の上で Shrink だけ内へ寄るように動かす。
+        // 遠近で縮む・大きく見える分を足す（奥は多めに、手前は少なめに動かす）
+        static float ShiftAt(float z, float shrink) => shrink * (CamDist + z) / CamDist;
+        static float FarZ(ObiRing r) => r.R * Mathf.Cos(r.Tilt * Mathf.Deg2Rad);
+
+        public static ObiRing TopFor(float aspect) => Top.WithCenter(Top.Center - new Vector2(0, ShiftAt(FarZ(Top), Shrink(aspect))));
+        public static ObiRing BottomFor(float aspect) => Bottom.WithCenter(Bottom.Center + new Vector2(0, ShiftAt(-FarZ(Bottom), Shrink(aspect))));
 
         /// <summary>帯の点の並び（画面の左→右）。上は θ=π→0、下は θ=π→2π</summary>
         public static Vector3[] ArcPoints(ObiRing ring, bool top, int n)

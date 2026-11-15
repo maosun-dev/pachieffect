@@ -109,6 +109,22 @@ namespace PachiMoji.EditorTools
                 Expect(EffectCatalog.Get("知らない").Id == "oudou", "知らない ID は王道昇格");
                 Expect(EffectCatalog.All[0].RequiredProduct == null, "王道昇格は無料");
 
+                // 激アツの帯：一覧にあって無料、組み立て直しても物が残らない、写真が無いパスでも組める
+                Expect(EffectCatalog.Get("obi").Id == "obi" && EffectCatalog.Get("obi").RequiredProduct == null, "激アツの帯は一覧にあって無料");
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                go0 = CountSceneObjects(); mat0 = Count<Material>(); mesh0 = Count<Mesh>();
+                for (int i = 0; i < 5; i++)
+                {
+                    var e = EffectCatalog.Get("obi").Create();
+                    e.Build(new[] { "定時" + i, "退社" }, 0.5f, new EffectSettings { EffectId = "obi", PhotoPath = "Z:/無い/写真.jpg" });
+                    e.Evaluate(0); e.Evaluate(ObiPlan.Duration); e.Idle(13f);
+                    Expect(Mathf.Approximately(e.Duration, 10f), "激アツの帯は10秒");
+                    e.Dispose();
+                }
+                go1 = CountSceneObjects(); mat1 = Count<Material>(); mesh1 = Count<Mesh>();
+                Debug.Log($"[PachiAppCheck] 帯の組み立て直しの前後 物 {go0}→{go1} 材質 {mat0}→{mat1} メッシュ {mesh0}→{mesh1}");
+                Expect(go1 == go0 && mat1 == mat0 && mesh1 == mesh0, "帯を組み立て直しても物が残らない");
+
                 // チラ見せの色：2文字目のまん中（文字色 金・背景 紫／文字色 虹・背景 銀）
                 foreach (var (tx, bk) in new[] { (Tier.Gold, Tier.Purple), (Tier.Rainbow, Tier.Silver) })
                 {

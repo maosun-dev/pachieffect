@@ -77,6 +77,18 @@ namespace PachiMoji.Tests
         }
 
         [Test]
+        public void 縦が短い画面でも帯はふちから同じ見え方の距離にある()
+        {
+            // 見える高さが減った半分だけ、帯の一番外側が画面の上でも内へ寄る（遠近で縮む分も足して）
+            float a = 9f / 16f;
+            float dist = ObiPlan.ViewH * 0.5f / Mathf.Tan(ObiPlan.Fov * 0.5f * Mathf.Deg2Rad);
+            float shrink = (ObiPlan.ViewH - ObiPlan.ViewH * ObiPlan.BaseAspect / a) / 2;
+            float Proj(Vector3 p) => p.y * dist / (dist + p.z);
+            Assert.AreEqual(Proj(ObiPlan.Top.Point(Mathf.PI / 2)) - shrink, Proj(ObiPlan.TopFor(a).Point(Mathf.PI / 2)), 1e-3f);
+            Assert.AreEqual(Proj(ObiPlan.Bottom.Point(-Mathf.PI / 2)) + shrink, Proj(ObiPlan.BottomFor(a).Point(-Mathf.PI / 2)), 1e-3f);
+        }
+
+        [Test]
         public void 帯の点は左から右に並ぶ()
         {
             var top = ObiPlan.ArcPoints(ObiPlan.Top, true, 100);

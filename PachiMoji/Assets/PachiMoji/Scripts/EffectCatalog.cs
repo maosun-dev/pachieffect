@@ -17,6 +17,7 @@ namespace PachiMoji
         public static readonly EffectEntry[] All =
         {
             new EffectEntry { Id = "oudou", Name = "王道昇格", RequiredProduct = null, Create = () => new OudouEffect() },
+            new EffectEntry { Id = "obi", Name = "激アツの帯", RequiredProduct = null, Create = () => new ObiEffect() },
         };
 
         /// <summary>ID から探す。知らない ID なら最初の演出</summary>
