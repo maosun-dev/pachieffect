@@ -9,6 +9,9 @@ namespace PachiMoji
     /// </summary>
     public static class ObiBand
     {
+        /// <summary>帯の地の黒の濃さ（0〜1）。ユーザーの選びで透明（金の縁と文字だけが写真の上を流れる）</summary>
+        public static float BaseAlpha = 0f;
+
         /// <summary>帯の面の向き：fwd は文字の奥向き、up は帯の幅の向き</summary>
         public static void Frame(Vector3 p, Vector3 tan, Vector3 camPos, out Vector3 fwd, out Vector3 up)
         {
@@ -24,7 +27,13 @@ namespace PachiMoji
             root.transform.SetParent(parent, false);
             float hw = bandW * 0.5f;
             const float back = 0.12f;   // 文字の裏に少し下げる
-            Strip(root, arc, camPos, "Base", -hw * 0.86f, hw * 0.86f, back, back, 0, Mat("black", 0.6f));
+            // 帯の地：黒を BaseAlpha の濃さで重ねる（0＝透明で写真がそのまま見える）
+            if (BaseAlpha > 0)
+            {
+                var shade = new Material(Shader.Find("PachiMoji/Shade"));
+                shade.SetColor("_Color", new Color(0.02f, 0.01f, 0.0f, BaseAlpha));
+                Strip(root, arc, camPos, "Base", -hw * 0.86f, hw * 0.86f, back, back, 0, shade);
+            }
             var rim = Mat("goldRim", 3f);
             Strip(root, arc, camPos, "RimTopOut", hw * 0.93f, hw, back - 0.06f, back, +0.6f, rim);
             Strip(root, arc, camPos, "RimTopIn", hw * 0.86f, hw * 0.93f, back, back - 0.06f, -0.6f, rim);
