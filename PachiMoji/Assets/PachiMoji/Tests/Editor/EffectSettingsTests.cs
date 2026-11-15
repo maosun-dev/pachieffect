@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS", "exportWide", "obiLayout" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -262,6 +262,22 @@ namespace PachiMoji.Tests
             var o = EffectSettings.ClampObiOffset(new Vector2(99, -99));
             Assert.AreEqual(EffectSettings.ObiOffsetMax, o.x);
             Assert.AreEqual(-EffectSettings.ObiOffsetMax, o.y);
+        }
+
+        [Test]
+        public void 書き出しの向きの既定は縦で保存できる()
+        {
+            Assert.IsFalse(EffectSettings.Load(P).ExportWide);
+            new EffectSettings { ExportWide = true }.Save(P);
+            Assert.IsTrue(EffectSettings.Load(P).ExportWide);
+        }
+
+        [Test]
+        public void 帯の置き方の既定は斜めで保存できる()
+        {
+            Assert.AreEqual(ObiLayout.Slant, EffectSettings.Load(P).ObiLayout);
+            new EffectSettings { ObiLayout = ObiLayout.Straight }.Save(P);
+            Assert.AreEqual(ObiLayout.Straight, EffectSettings.Load(P).ObiLayout);
         }
     }
 }

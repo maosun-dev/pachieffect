@@ -30,6 +30,10 @@ namespace PachiMoji
         TMP_Text percentLabel, saveLabel; RectTransform progressFill; float progressWidth;
         Image dome; TMP_Text pushLabel;
         float deckHeight; bool pushOn = true;
+        AspectRatioFitter exportFit;
+
+        /// <summary>書き出している板の縦横比（縦・横の書き出し）</summary>
+        public void SetExportAspect(float aspect) => exportFit.aspectRatio = aspect;
 
         /// <summary>UI カメラに描く Canvas を作る（基準 390×844、幅に合わせる）。返すのは根っこ</summary>
         public static RectTransform CreateCanvas(Camera uiCam)
@@ -217,6 +221,7 @@ namespace PachiMoji
             var fit = view.gameObject.AddComponent<AspectRatioFitter>();
             fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             fit.aspectRatio = (float)ExportPlan.Width / ExportPlan.Height;
+            m.exportFit = fit;
 
             // 書き出し中：数字・溝と金の帯・説明・やめる
             var run = Rect(m.StagePlayArea, "ExportRun");

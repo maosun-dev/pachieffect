@@ -5,6 +5,15 @@ namespace PachiMoji.Tests
     /// <summary>動画の書き出しの計算（コマ数・時刻・％・空き容量・印の位置）と知らせの文</summary>
     public class ExportRulesTests
     {
+        [Test] public void 書き出しの大きさは縦と横() { Assert.AreEqual(new UnityEngine.Vector2Int(1080, 1920), ExportPlan.Size(false)); Assert.AreEqual(new UnityEngine.Vector2Int(1920, 1080), ExportPlan.Size(true)); }
+        [Test] public void 横向きでも印は右下で短い辺に合わせた大きさ()
+        {
+            var r = ExportPlan.WatermarkRect(640, 128, 1920, 1080);
+            UnityEngine.Assertions.Assert.AreApproximatelyEqual(324f, r.width, 0.01f);
+            UnityEngine.Assertions.Assert.AreApproximatelyEqual(1920f - 1080f * 0.035f - 324f, r.x, 0.01f);
+            UnityEngine.Assertions.Assert.AreApproximatelyEqual(1080f * 0.035f, r.y, 0.01f);
+            Assert.AreEqual(ExportPlan.WatermarkRect(640, 128), ExportPlan.WatermarkRect(640, 128, 1080, 1920));
+        }
         [Test] public void 最後のコマまで数える() { Assert.AreEqual(451, ExportPlan.FrameCount(15f)); Assert.AreEqual(271, ExportPlan.FrameCount(9f)); }
         [Test] public void くり返す演出は終わりの時刻のコマを入れない() { Assert.AreEqual(300, ExportPlan.FrameCount(10f, true)); Assert.AreEqual(301, ExportPlan.FrameCount(10f, false)); }
         [Test] public void 割り切れない長さは最後に終わりの時刻のコマを足す() => Assert.AreEqual(272, ExportPlan.FrameCount(9.02f));

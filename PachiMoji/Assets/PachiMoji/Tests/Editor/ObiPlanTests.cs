@@ -89,6 +89,42 @@ namespace PachiMoji.Tests
         }
 
         [Test]
+        public void 横長の画面の斜めの帯は基準の輪のまま()
+        {
+            Assert.AreEqual(ObiPlan.Top.Center, ObiPlan.TopFor(16f / 9f).Center);
+            Assert.AreEqual(ObiPlan.Top.Roll, ObiPlan.TopFor(16f / 9f).Roll);
+            Assert.AreEqual(ObiPlan.Bottom.Center, ObiPlan.BottomFor(16f / 9f).Center);
+        }
+
+        [Test]
+        public void まっすぐの帯は上と下を左から右へ水平に通る()
+        {
+            var top = ObiPlan.StraightPoints(true, 100, 8f, 2f, 0);
+            var bot = ObiPlan.StraightPoints(false, 100, 8f, 2f, 0);
+            Assert.AreEqual(101, top.Length);
+            Assert.Less(top[0].x, top[100].x);
+            Assert.Less(bot[0].x, bot[100].x);
+            Assert.AreEqual(top[0].y, top[100].y, 1e-5f);
+            Assert.Greater(top[50].y, 0);
+            Assert.Less(bot[50].y, 0);
+            Assert.LessOrEqual(top[0].x, -8f);
+            Assert.GreaterOrEqual(top[100].x, 8f);
+        }
+
+        [Test]
+        public void まっすぐの帯は少し斜めにできて上下の傾きは同じ()
+        {
+            var top = ObiPlan.StraightPoints(true, 100, 8f, 2f, ObiPlan.StraightSlant);
+            var bot = ObiPlan.StraightPoints(false, 100, 8f, 2f, ObiPlan.StraightSlant);
+            Assert.Greater(top[0].y, top[100].y);   // 左が高く、右へ下がる
+            float st = (top[100].y - top[0].y) / (top[100].x - top[0].x);
+            float sb = (bot[100].y - bot[0].y) / (bot[100].x - bot[0].x);
+            Assert.AreEqual(st, sb, 1e-5f);
+            Assert.AreEqual(2f, top[50].y, 1e-4f);
+            Assert.AreEqual(-2f, bot[50].y, 1e-4f);
+        }
+
+        [Test]
         public void 帯の点は左から右に並ぶ()
         {
             var top = ObiPlan.ArcPoints(ObiPlan.Top, true, 100);

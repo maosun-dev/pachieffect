@@ -10,6 +10,7 @@ namespace PachiMoji
     public enum ObiRed { None, Half, Strong }
     public enum ObiGlow { None, Gold, Fire }
     public enum ObiGlowAmount { Low, Mid, High }
+    public enum ObiLayout { Slant, Straight }   // 激アツの帯の置き方：斜め・上下をまっすぐ（縦・横どちらの書き出しにも効く）
     /// <summary>演出の好み。端末（PlayerPrefs）に残し、再生にも書き出しにも同じように効く</summary>
     public class EffectSettings
     {
@@ -35,6 +36,8 @@ namespace PachiMoji
         public bool ObiBlueBack;                         // 激アツの帯：背景を青一色にする（ブルーバック。写真・模様は出さない。金の字と反対の色で抜きやすい）
         // 激アツの帯：上の列・下の列のずらし（画面の高さを 10 とする単位）と大きさ（指で合わせる）
         public Vector2 ObiTopOffset, ObiBottomOffset;
+        public ObiLayout ObiLayout = ObiLayout.Slant;   // 激アツの帯：帯の置き方
+        public bool ExportWide;                       // 書き出す動画の向き（false＝縦 1080×1920、true＝横 1920×1080）。どの演出にも効く
         public float ObiTopScale = 1, ObiBottomScale = 1;
 
         public const float ObiScaleMin = 0.5f, ObiScaleMax = 2f, ObiOffsetMax = 6f;
@@ -87,6 +90,8 @@ namespace PachiMoji
             s.ObiGlow = (ObiGlow)Pick(prefix + "obiGlow", (int)d.ObiGlow, 2);
             s.ObiGlowAmount = (ObiGlowAmount)Pick(prefix + "obiGlowAmount", (int)d.ObiGlowAmount, 2);
             s.ObiBlueBack = PlayerPrefs.GetInt(prefix + "obiBlueBack", 0) != 0;
+            s.ExportWide = PlayerPrefs.GetInt(prefix + "exportWide", 0) != 0;
+            s.ObiLayout = (ObiLayout)Pick(prefix + "obiLayout", 0, 1);
             s.ObiTopOffset = ClampObiOffset(new Vector2(PlayerPrefs.GetFloat(prefix + "obiTopX", 0), PlayerPrefs.GetFloat(prefix + "obiTopY", 0)));
             s.ObiBottomOffset = ClampObiOffset(new Vector2(PlayerPrefs.GetFloat(prefix + "obiBotX", 0), PlayerPrefs.GetFloat(prefix + "obiBotY", 0)));
             s.ObiTopScale = ClampObiScale(PlayerPrefs.GetFloat(prefix + "obiTopS", 1));
@@ -114,6 +119,8 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "obiGlow", (int)ObiGlow);
             PlayerPrefs.SetInt(prefix + "obiGlowAmount", (int)ObiGlowAmount);
             PlayerPrefs.SetInt(prefix + "obiBlueBack", ObiBlueBack ? 1 : 0);
+            PlayerPrefs.SetInt(prefix + "exportWide", ExportWide ? 1 : 0);
+            PlayerPrefs.SetInt(prefix + "obiLayout", (int)ObiLayout);
             PlayerPrefs.SetFloat(prefix + "obiTopX", ObiTopOffset.x);
             PlayerPrefs.SetFloat(prefix + "obiTopY", ObiTopOffset.y);
             PlayerPrefs.SetFloat(prefix + "obiTopS", ObiTopScale);

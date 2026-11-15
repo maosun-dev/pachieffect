@@ -66,9 +66,14 @@ namespace PachiMoji
             m.scroll.scrollSensitivity = 20;
 
             // 演出ごとに項目を分ける（王道昇格と激アツの帯は別の演出。選んでいる演出の項目だけを出す）
-            m.oudouBox = Box(content, "Oudou");
-            m.obiBox = Box(content, "Obi");
+            // どの演出にも効く項目（いちばん上に1つだけ）
             float y = -28;
+            m.Choice(content, ref y, "書き出す動画の向き", new[] { "縦 9:16", "横 16:9" }, null, settings.ExportWide ? 1 : 0, 150,
+                i => settings.ExportWide = i == 1);
+            m.commonH = -y - 28;
+            m.oudouBox = Box(content, "Oudou", -m.commonH);
+            m.obiBox = Box(content, "Obi", -m.commonH);
+            y = -28;
             var parent = m.oudouBox;
             m.Choice(parent, ref y, "火花", new[] { "あり", "なし" }, null, settings.SparksOn ? 0 : 1, 150,
                 i => settings.SparksOn = i == 0);
@@ -98,6 +103,8 @@ namespace PachiMoji
                 i => settings.ObiGlowAmount = (ObiGlowAmount)i);
             m.Choice(parent, ref y, "ブルーバック（背景を青一色に）", new[] { "なし", "あり" }, null, settings.ObiBlueBack ? 1 : 0, 150,
                 i => settings.ObiBlueBack = i == 1);
+            m.Choice(parent, ref y, "帯の置き方", new[] { "斜め", "上下をまっすぐ" }, null, (int)settings.ObiLayout, 150,
+                i => settings.ObiLayout = (ObiLayout)i);
             m.obiH = -y + 24;
             m.SetEffect(settings.EffectId);
 
@@ -107,15 +114,15 @@ namespace PachiMoji
         }
 
         RectTransform oudouBox, obiBox;
-        float oudouH, obiH;
+        float oudouH, obiH, commonH;
 
         // 項目をまとめる入れ物（中身の上の端にそろえる）
-        static RectTransform Box(RectTransform content, string name)
+        static RectTransform Box(RectTransform content, string name, float top)
         {
             var b = MainScreen.Rect(content, name);
             b.anchorMin = new Vector2(0, 1); b.anchorMax = new Vector2(1, 1);
             b.pivot = new Vector2(0.5f, 1);
-            b.anchoredPosition = Vector2.zero;
+            b.anchoredPosition = new Vector2(0, top);
             b.sizeDelta = Vector2.zero;
             return b;
         }
@@ -126,7 +133,7 @@ namespace PachiMoji
             bool obi = EffectCatalog.Get(effectId).Id == "obi";
             obiBox.gameObject.SetActive(obi);
             oudouBox.gameObject.SetActive(!obi);
-            content.sizeDelta = new Vector2(0, obi ? obiH : oudouH);
+            content.sizeDelta = new Vector2(0, commonH + (obi ? obiH : oudouH));
             content.anchoredPosition = Vector2.zero;
         }
 

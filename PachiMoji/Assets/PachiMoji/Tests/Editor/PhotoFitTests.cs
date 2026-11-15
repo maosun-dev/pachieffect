@@ -52,5 +52,17 @@ namespace PachiMoji.Tests
             Assert.AreEqual(4f, PhotoFit.ClampZoom(9f));
             Assert.AreEqual(2f, PhotoFit.ClampZoom(2f));
         }
+
+        [Test]
+        public void 横長の枠でも写真は枠を覆う([Values(0.5f, 1f, 4f / 3f, 3f)] float img)
+        {
+            const float fa = 16f / 9f;   // 横長の枠（横÷縦）
+            var s = PhotoFit.Size(img, 1, fa);
+            Assert.GreaterOrEqual(s.x, 1f - 1e-5f);
+            Assert.GreaterOrEqual(s.y, 1f / fa - 1e-5f);
+            Assert.IsTrue(UnityEngine.Mathf.Approximately(s.x, 1f) || UnityEngine.Mathf.Approximately(s.y, 1f / fa));   // 片方はちょうど
+            var o = PhotoFit.ClampOffset(new UnityEngine.Vector2(9, 9), img, 1, fa);
+            Assert.AreEqual((s.y - 1f / fa) / 2, o.y, 1e-5f);
+        }
     }
 }

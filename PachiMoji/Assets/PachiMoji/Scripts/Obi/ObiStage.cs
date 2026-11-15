@@ -52,6 +52,13 @@ namespace PachiMoji
             // 横幅を基準の画面と同じに保つ：縦が短い画面は縦の画角を狭める
             float halfW = ObiPlan.ViewH * ObiPlan.BaseAspect * 0.5f;
             float halfH = halfW / aspect;
+            if (aspect >= 1)
+            {
+                // 横長（16:9 の書き出し）：高さを基準にする。帯の輪がまるごと横に広がって見える
+                halfH = ObiPlan.ViewH * 0.5f * LandscapeHeight;
+                halfW = halfH * aspect;
+            }
+            st.frameAspect = aspect >= 1 ? aspect : PhotoFit.FrameAspect;
 
             // カメラ
             var camGo = new GameObject("Camera");
@@ -111,8 +118,10 @@ namespace PachiMoji
 
             // 帯：画面に見える範囲（＋少し外）だけに切る（短いほど目安の速さで 10 秒につながる）
             // 上の列・下の列は、指で合わせたずらしと大きさで動かす（列ごとの入れ物を、列のまん中を中心に動かす・大きくする）
-            var topPts = ObiPlan.ArcPoints(ObiPlan.TopFor(aspect), true, 600);
-            var botPts = ObiPlan.ArcPoints(ObiPlan.BottomFor(aspect), false, 600);
+            bool straight = settings.ObiLayout == ObiLayout.Straight;
+            float sy = halfH * ObiPlan.StraightHeight * (dist + ObiPlan.StraightZ) / dist;   // 奥行きの分も入れて、画面の上下の同じ割合の高さに
+            var topPts = straight ? ObiPlan.StraightPoints(true, 600, halfW * 1.8f, sy, ObiPlan.StraightSlant) : ObiPlan.ArcPoints(ObiPlan.TopFor(aspect), true, 600);
+            var botPts = straight ? ObiPlan.StraightPoints(false, 600, halfW * 1.8f, sy, ObiPlan.StraightSlant) : ObiPlan.ArcPoints(ObiPlan.BottomFor(aspect), false, 600);
             var fits = new[] { (settings.ObiTopOffset, settings.ObiTopScale), (settings.ObiBottomOffset, settings.ObiBottomScale) };
             var pivots = new[] { topPts[300], botPts[300] };
             var lanes = new[]
@@ -161,7 +170,8 @@ namespace PachiMoji
                     // 角のキラッは4文字に1つだけ
                     var rig = copy.GetComponent<PachiText.Rig>();
                     for (int g = 0; g < rig.glints.Count; g++) rig.glints[g].gameObject.SetActive(k % 4 == 0 && g == 0);
-                    copy.transform.localRotation = lane.dir < 0 ? TopTurn : BottomTurn;
+                    // まっすぐの帯は、上の列も下の列も同じ向き（傾きをそろえる）
+                    copy.transform.localRotation = straight || lane.dir < 0 ? TopTurn : BottomTurn;
                     st.letters.Add((holder.transform, lane, k * ObiPlan.Spacing, 0, false));
                 }
 
@@ -239,8 +249,8 @@ namespace PachiMoji
         public void SetPhotoFit(Vector2 offset, float zoom)
         {
             if (photoQuad == null) return;
-            var size = PhotoFit.Size(photoAspect, zoom) * frameW;
-            var off = PhotoFit.ClampOffset(offset, photoAspect, zoom) * frameW;
+            var size = PhotoFit.Size(photoAspect, zoom, frameAspect) * frameW;
+            var off = PhotoFit.ClampOffset(offset, photoAspect, zoom, frameAspect) * frameW;
             photoQuad.localPosition = new Vector3(off.x, off.y, PhotoZ);
             photoQuad.localScale = new Vector3(size.x, size.y, 1);
         }
@@ -261,6 +271,10 @@ namespace PachiMoji
 
         /// <summary>画面の縦の長さ（0〜1）を、帯の動く単位に直す倍率</summary>
         public float UnitsPerScreenHeight => 2 * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * -camPos.z;
+
+        float frameAspect = PhotoFit.FrameAspect;   // 写真で覆う枠の横÷縦（縦の書き出しは 9:16、横は 16:9）
+        /// <summary>横長のとき、基準の画面の高さのどれだけを映すか</summary>
+        const float LandscapeHeight = 0.62f;
 
         public bool HasPhoto => photoQuad != null;
         public float PhotoAspect => photoAspect;

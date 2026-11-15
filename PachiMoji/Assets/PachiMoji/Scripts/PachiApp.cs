@@ -242,6 +242,7 @@ namespace PachiMoji
                 return;
             }
             ui.ExportView.texture = exporter.Preview;
+            ui.SetExportAspect((float)exporter.W / exporter.H);
             ui.SetExportProgress(0);
             SetState(AppState.Exporting);
         }
@@ -315,7 +316,7 @@ namespace PachiMoji
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
             + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom
             + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiBlueBack
-            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale;
+            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale + settings.ObiLayout;
 
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()

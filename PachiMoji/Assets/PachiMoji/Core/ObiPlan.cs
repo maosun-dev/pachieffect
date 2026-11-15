@@ -44,7 +44,8 @@ namespace PachiMoji
         public static readonly ObiRing Bottom = new ObiRing(6.2f, 24, -32, new Vector2(0, 0.2f));
 
         // 横幅を基準の画面と同じに保つので、縦が短い画面では見える高さが減る。その半分だけ帯を内へ寄せる
-        static float Shrink(float aspect) => ViewH * (1 - BaseAspect / aspect) / 2;
+        // 横長の画面（横÷縦 1 以上）は高さを基準にするので寄せない
+        static float Shrink(float aspect) => aspect >= 1 ? 0 : ViewH * (1 - BaseAspect / aspect) / 2;
 
         public static readonly float CamDist = ViewH * 0.5f / Mathf.Tan(Fov * 0.5f * Mathf.Deg2Rad);   // カメラから z=0 の面まで
 
@@ -53,8 +54,29 @@ namespace PachiMoji
         static float ShiftAt(float z, float shrink) => shrink * (CamDist + z) / CamDist;
         static float FarZ(ObiRing r) => r.R * Mathf.Cos(r.Tilt * Mathf.Deg2Rad);
 
-        public static ObiRing TopFor(float aspect) => Top.WithCenter(Top.Center - new Vector2(0, ShiftAt(FarZ(Top), Shrink(aspect))));
-        public static ObiRing BottomFor(float aspect) => Bottom.WithCenter(Bottom.Center + new Vector2(0, ShiftAt(-FarZ(Bottom), Shrink(aspect))));
+        // 横長の画面（横÷縦 1 以上）は、斜めの帯（基準の輪のまま）。まっすぐの帯は StraightPoints
+        public static ObiRing TopFor(float aspect) => aspect >= 1 ? Top
+            : Top.WithCenter(Top.Center - new Vector2(0, ShiftAt(FarZ(Top), Shrink(aspect))));
+        public static ObiRing BottomFor(float aspect) => aspect >= 1 ? Bottom
+            : Bottom.WithCenter(Bottom.Center + new Vector2(0, ShiftAt(-FarZ(Bottom), Shrink(aspect))));
+
+        /// <summary>まっすぐの帯の高さ（画面の半分の高さに対する割合）と奥行き</summary>
+        public const float StraightHeight = 0.7f, StraightZ = 0.5f;
+        /// <summary>まっすぐの帯の傾き（度。左上から右へ下がる。女神降臨の帯のように少しだけ斜め）</summary>
+        public const float StraightSlant = 8f;
+
+        /// <summary>まっすぐの帯：上と下を水平に、左（-halfW）から右（+halfW）へ。y は列の高さ（上の列は +y、下の列は -y）</summary>
+        public static Vector3[] StraightPoints(bool top, int n, float halfW, float y, float slantDeg)
+        {
+            var pts = new Vector3[n + 1];
+            float k = Mathf.Tan(slantDeg * Mathf.Deg2Rad);
+            for (int i = 0; i <= n; i++)
+            {
+                float x = Mathf.Lerp(-halfW, halfW, i / (float)n);
+                pts[i] = new Vector3(x, (top ? y : -y) - x * k, StraightZ);
+            }
+            return pts;
+        }
 
         /// <summary>帯の点の並び（画面の左→右）。上は θ=π→0、下は θ=π→2π</summary>
         public static Vector3[] ArcPoints(ObiRing ring, bool top, int n)

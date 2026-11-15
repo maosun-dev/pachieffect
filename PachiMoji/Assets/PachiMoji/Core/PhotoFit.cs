@@ -10,19 +10,18 @@ namespace PachiMoji
     {
         public const float FrameAspect = 9f / 16f;
         public const float MaxZoom = 4;
-        const float FrameH = 1 / FrameAspect;
 
-        /// <summary>写真の幅・高さ（imgAspect は写真の横÷縦）</summary>
-        public static Vector2 Size(float imgAspect, float zoom)
+        /// <summary>写真の幅・高さ（imgAspect は写真の横÷縦、frameAspect は枠の横÷縦。既定は縦の 9:16）</summary>
+        public static Vector2 Size(float imgAspect, float zoom, float frameAspect = FrameAspect)
         {
-            float s = Mathf.Max(1 / imgAspect, FrameH) * ClampZoom(zoom);
+            float s = Mathf.Max(1 / imgAspect, 1 / frameAspect) * ClampZoom(zoom);
             return new Vector2(imgAspect * s, s);
         }
 
-        public static Vector2 ClampOffset(Vector2 offset, float imgAspect, float zoom)
+        public static Vector2 ClampOffset(Vector2 offset, float imgAspect, float zoom, float frameAspect = FrameAspect)
         {
-            var s = Size(imgAspect, zoom);
-            float mx = (s.x - 1) / 2, my = (s.y - FrameH) / 2;
+            var s = Size(imgAspect, zoom, frameAspect);
+            float mx = (s.x - 1) / 2, my = (s.y - 1 / frameAspect) / 2;
             return new Vector2(Mathf.Clamp(offset.x, -mx, mx), Mathf.Clamp(offset.y, -my, my));
         }
 

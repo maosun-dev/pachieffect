@@ -37,6 +37,9 @@ namespace PachiMoji
         public ExportStatus Status { get; private set; } = ExportStatus.Running;
         public ExportError Error { get; private set; }
         public int TotalFrames { get; private set; }
+        /// <summary>書き出す動画の大きさ（設定の向きで決まる）</summary>
+        public int W { get; private set; } = ExportPlan.Width;
+        public int H { get; private set; } = ExportPlan.Height;
         public float Duration { get; private set; }
         public int Percent => ExportPlan.Percent(appended, TotalFrames, Status == ExportStatus.Done);
         public Texture Preview => rt;
@@ -55,14 +58,16 @@ namespace PachiMoji
         public ExportError Start()
         {
             effect = EffectCatalog.Get(settings?.EffectId).Create();
-            effect.Build(lines, (float)ExportPlan.Width / ExportPlan.Height, settings);
+            var size = ExportPlan.Size(settings != null && settings.ExportWide);
+            W = size.x; H = size.y;
+            effect.Build(lines, (float)W / H, settings);
             Duration = effect.Duration;
             TotalFrames = ExportPlan.FrameCount(Duration, effect.Loops);
 
             string dir = Path.GetDirectoryName(Path.GetFullPath(OutputPath));
             if (writer.FreeBytes(dir) < ExportPlan.NeedBytes(Duration)) return Fail(ExportError.NoSpace);
 
-            rt = new RenderTexture(ExportPlan.Width, ExportPlan.Height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { name = "Export" };
+            rt = new RenderTexture(W, H, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { name = "Export" };
             rt.Create();
             var cam = effect.Camera;
             cam.targetTexture = rt;
@@ -71,7 +76,7 @@ namespace PachiMoji
             if (watermark) mark = Resources.Load<Texture2D>("Export/Watermark");
 
             started = true;
-            var e = writer.Begin(OutputPath, ExportPlan.Width, ExportPlan.Height, ExportPlan.Fps);
+            var e = writer.Begin(OutputPath, W, H, ExportPlan.Fps);
             return e == ExportError.None ? e : Fail(e);
         }
 
@@ -102,7 +107,7 @@ namespace PachiMoji
                 var (frame, req) = pending.Dequeue();
                 if (req.hasError) { Fail(ExportError.WriteFailed); return; }
                 var copy = spare.Count > 0 ? spare.Pop()
-                    : new NativeArray<byte>(ExportPlan.Width * ExportPlan.Height * 4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+                    : new NativeArray<byte>(W * H * 4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                 copy.CopyFrom(req.GetData<byte>());
                 ready.Enqueue((frame, copy));
             }
@@ -144,9 +149,9 @@ namespace PachiMoji
             RenderTexture.active = rt;
             GL.PushMatrix();
             // DrawTexture は上から下へ数える座標で描く（下から数えると絵が上下さかさまになる）
-            GL.LoadPixelMatrix(0, ExportPlan.Width, ExportPlan.Height, 0);
-            var r = ExportPlan.WatermarkRect(mark.width, mark.height);
-            r.y = ExportPlan.Height - r.y - r.height;
+            GL.LoadPixelMatrix(0, W, H, 0);
+            var r = ExportPlan.WatermarkRect(mark.width, mark.height, W, H);
+            r.y = H - r.y - r.height;
             // DrawTexture の色は 0.5 がそのまま（2倍される）。不透明度 0.9
             Graphics.DrawTexture(r, mark, new Rect(0, 0, 1, 1), 0, 0, 0, 0, new Color(0.5f, 0.5f, 0.5f, 0.45f));
             GL.PopMatrix();

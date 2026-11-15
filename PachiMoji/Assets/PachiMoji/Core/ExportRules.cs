@@ -29,11 +29,18 @@ namespace PachiMoji
         public static long NeedBytes(float duration) => (long)(duration * BitRate / 8 * 1.5) + 50L * 1024 * 1024;
 
         /// <summary>印を置く場所（左下原点の画素）。幅は動画の 3 割、右下に幅の 3.5% の余白</summary>
-        public static Rect WatermarkRect(int texW, int texH)
+        public static Rect WatermarkRect(int texW, int texH) => WatermarkRect(texW, texH, Width, Height);
+
+        /// <summary>印を置く場所（動画の大きさ frameW×frameH）。幅は短い辺の 3 割、右下に短い辺の 3.5% の余白</summary>
+        public static Rect WatermarkRect(int texW, int texH, int frameW, int frameH)
         {
-            float w = Width * 0.30f, h = w * texH / texW, m = Width * 0.035f;
-            return new Rect(Width - m - w, m, w, h);
+            float side = Mathf.Min(frameW, frameH);
+            float w = side * 0.30f, h = w * texH / texW, m = side * 0.035f;
+            return new Rect(frameW - m - w, m, w, h);
         }
+
+        /// <summary>書き出す動画の大きさ（縦 1080×1920・横 1920×1080）</summary>
+        public static Vector2Int Size(bool wide) => wide ? new Vector2Int(Height, Width) : new Vector2Int(Width, Height);
     }
 
     /// <summary>書き出し・保存で起きること</summary>

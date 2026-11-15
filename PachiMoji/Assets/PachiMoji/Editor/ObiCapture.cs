@@ -33,6 +33,10 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_red_strong.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiRed = ObiRed.Strong }, false);
                 Shoot(Path.Combine(outDir, "obi_glow_gold.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = ObiGlow.Gold }, true);
                 Shoot(Path.Combine(outDir, "obi_glow_fire.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = ObiGlow.Fire }, true);
+                Shoot(Path.Combine(outDir, "obi_16x9.png"), 1920, 1080, 2, 0, settings, false);
+                Shoot(Path.Combine(outDir, "obi_16x9_photo.png"), 1920, 1080, 2, 0, settings, true);
+                Shoot(Path.Combine(outDir, "obi_9x16_straight.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiLayout = ObiLayout.Straight }, true);
+                Shoot(Path.Combine(outDir, "obi_16x9_straight.png"), 1920, 1080, 2, 0, new EffectSettings { EffectId = "obi", ObiLayout = ObiLayout.Straight }, true);
                 Shoot(Path.Combine(outDir, "obi_fit.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiTopOffset = new Vector2(0, 0.8f), ObiTopScale = 0.8f, ObiBottomScale = 1.2f }, false);
                 Shoot(Path.Combine(outDir, "obi_blueback.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiBlueBack = true }, true);
                 foreach (var g in new[] { ObiGlow.Gold, ObiGlow.Fire })
