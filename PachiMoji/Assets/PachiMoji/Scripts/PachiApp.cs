@@ -433,7 +433,7 @@ namespace PachiMoji
             var size = ExportPlan.Size(settings.ExportWide);
             editUi.Begin(settings.PhotoOffset, settings.PhotoZoom, obi.PhotoAspect, obi.HasPhoto,
                 settings.ObiTopOffset, settings.ObiTopScale, settings.ObiBottomOffset, settings.ObiBottomScale,
-                obi.UnitsPerScreenHeight, (float)size.x / size.y);
+                obi.UnitsPerScreenHeight, (float)size.x / size.y, !settings.ObiBlueBack);
             editUi.SetVideo(settings.VideoStart, settings.VideoEnd, obi.HasVideo ? Mathf.Max(obi.VideoLength, settings.VideoEnd) : 0);
         }
 

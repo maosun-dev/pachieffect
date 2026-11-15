@@ -521,6 +521,10 @@ namespace PachiMoji.EditorTools
             Expect(Mathf.Approximately(view.LaneScale(0), EffectSettings.ObiScaleMax) && Mathf.Approximately(view.MediaZoom, 1.2f),
                 "上の帯を動かしても写真は動かない・大きくしすぎても止まる");
             view.SetLane(0, Vector2.zero, 1);
+            view.Begin(Vector2.zero, 1, 1, true, Vector2.zero, 1, Vector2.zero, 1, 10, 9f / 16, false);
+            view.Select(EditView.Target.Media);
+            Expect(view.Current == EditView.Target.Top, "ブルーバックのときは写真・動画を選べない");
+            view.Begin(fx.PhotoOffset, fx.PhotoZoom, obi.PhotoAspect, obi.HasPhoto, Vector2.zero, 1, Vector2.zero, 1, obi.UnitsPerScreenHeight, 9f / 16);
             obi.Idle(1f);
             stage.Frame();
             stage.Effect.Camera.Render();

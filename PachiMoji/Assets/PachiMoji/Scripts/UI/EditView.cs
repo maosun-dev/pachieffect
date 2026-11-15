@@ -34,7 +34,7 @@ namespace PachiMoji
 
         // 写真
         Vector2 mediaOffset; float mediaZoom = 1, imgAspect = 1, frameAspect = PhotoFit.FrameAspect;
-        bool hasMedia;
+        bool hasMedia, mediaAllowed = true;
         RectTransform stageView;   // 書き出す動画の形に収めた舞台の板（指の動きを、この幅を 1 とする単位に直す）
         public Vector2 MediaOffset => mediaOffset;
         public float MediaZoom => mediaZoom;
@@ -99,6 +99,7 @@ namespace PachiMoji
                 m.tabTexts[i] = m.tabs[i].GetComponentInChildren<TMP_Text>();
                 m.tabBars[i] = Underline(m.tabs[i]);
                 m.tabs[i].onClick.AddListener(() => m.Select((Target)k));
+                m.tabs[i].gameObject.AddComponent<CanvasGroup>();
             }
             m.Pick = MainScreen.PlateButton(bar, "写真・動画を入れる", mid, new Vector2(-118, -30), new Vector2(110, 44), UiTheme.Body, 12, UiTheme.Chrome);
             m.pickText = m.Pick.GetComponentInChildren<TMP_Text>();
@@ -173,7 +174,8 @@ namespace PachiMoji
         /// 画面の縦を帯の単位に直す倍率、書き出す動画の横÷縦
         /// </summary>
         public void Begin(Vector2 offset, float zoom, float imgAspect, bool hasMedia,
-            Vector2 topOffset, float topScale, Vector2 bottomOffset, float bottomScale, float unitsPerScreenHeight, float frameAspect)
+            Vector2 topOffset, float topScale, Vector2 bottomOffset, float bottomScale, float unitsPerScreenHeight, float frameAspect,
+            bool mediaAllowed = true)
         {
             this.imgAspect = imgAspect;
             this.frameAspect = frameAspect;
@@ -182,8 +184,12 @@ namespace PachiMoji
             laneOffset[0] = topOffset; laneScale[0] = topScale;
             laneOffset[1] = bottomOffset; laneScale[1] = bottomScale;
             unitsPerScreen = unitsPerScreenHeight;
+            // ブルーバックのときは背景が青一色なので、写真・動画は選べない（タブを押せなくして薄くする）
+            this.mediaAllowed = mediaAllowed;
+            tabs[0].interactable = mediaAllowed;
+            tabs[0].GetComponent<CanvasGroup>().alpha = mediaAllowed ? 1 : 0.35f;
             SetHasMedia(hasMedia);
-            Select(hasMedia ? Target.Media : Target.Top);
+            Select(hasMedia && mediaAllowed ? Target.Media : Target.Top);
             Show(true);
         }
 
@@ -200,6 +206,7 @@ namespace PachiMoji
 
         public void Select(Target t)
         {
+            if (t == Target.Media && !mediaAllowed) t = Target.Top;
             Current = t;
             for (int i = 0; i < 3; i++)
             {
