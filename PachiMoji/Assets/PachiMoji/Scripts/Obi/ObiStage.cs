@@ -25,6 +25,7 @@ namespace PachiMoji
             public float Total => len[len.Length - 1];
             public float loop, speed;
             public int dir;
+            public Transform parent;   // 列の入れ物（指で合わせたずらし・大きさ）
 
             public void At(float s, out Vector3 p, out Vector3 tan)
             {
@@ -109,11 +110,28 @@ namespace PachiMoji
             float scale = ObiPlan.LetterH / maxH;
 
             // 帯：画面に見える範囲（＋少し外）だけに切る（短いほど目安の速さで 10 秒につながる）
+            // 上の列・下の列は、指で合わせたずらしと大きさで動かす（列ごとの入れ物を、列のまん中を中心に動かす・大きくする）
+            var topPts = ObiPlan.ArcPoints(ObiPlan.TopFor(aspect), true, 600);
+            var botPts = ObiPlan.ArcPoints(ObiPlan.BottomFor(aspect), false, 600);
+            var fits = new[] { (settings.ObiTopOffset, settings.ObiTopScale), (settings.ObiBottomOffset, settings.ObiBottomScale) };
+            var pivots = new[] { topPts[300], botPts[300] };
             var lanes = new[]
             {
-                st.MakeLane(ObiPlan.ArcPoints(ObiPlan.TopFor(aspect), true, 600), -1, halfW, halfH, dist, chars.Count),
-                st.MakeLane(ObiPlan.ArcPoints(ObiPlan.BottomFor(aspect), false, 600), +1, halfW, halfH, dist, chars.Count),
+                st.MakeLane(topPts, -1, halfW, halfH, dist, chars.Count, pivots[0], fits[0].Item1, fits[0].Item2),
+                st.MakeLane(botPts, +1, halfW, halfH, dist, chars.Count, pivots[1], fits[1].Item1, fits[1].Item2),
             };
+            for (int li = 0; li < 2; li++)
+            {
+                var outer = new GameObject(li == 0 ? "LaneTop" : "LaneBottom").transform;
+                outer.SetParent(st.root.transform, false);
+                var inner = new GameObject("Inner").transform;
+                inner.SetParent(outer, false);
+                inner.localPosition = -pivots[li];
+                st.laneOuter[li] = outer;
+                st.lanePivot[li] = pivots[li];
+                st.SetLaneFit(li, fits[li].Item1, fits[li].Item2);
+                lanes[li].parent = inner;
+            }
             int unit = chars.Count + 1;
             var rnd = new System.Random(20261115);   // キラキラの散らし方（いつも同じ）
             var starMat = new Material(Shader.Find("PachiMoji/Glint"));
@@ -123,7 +141,7 @@ namespace PachiMoji
             {
                 if (settings.ObiGlow != ObiGlow.None)
                 {
-                    var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW * settings.ObiGlowWidth, lane.loop, lane.speed, lane.dir, st.root.transform);
+                    var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW * settings.ObiGlowWidth, lane.loop, lane.speed, lane.dir, lane.parent);
                     fire.SetFloat("_Intensity", fire.GetFloat("_Intensity") * settings.ObiGlowBright);
                     fire.SetFloat("_Gold", settings.ObiGlow == ObiGlow.Gold ? 1 : 0);
                     st.fires.Add(fire);
@@ -135,7 +153,7 @@ namespace PachiMoji
                     if (ci == chars.Count) continue;   // 言葉と言葉のあいだ（炎だけ）
                     var tp = templates[chars[ci]];
                     var holder = new GameObject("Letter");
-                    holder.transform.SetParent(st.root.transform, false);
+                    holder.transform.SetParent(lane.parent, false);
                     var copy = Object.Instantiate(tp.go, holder.transform);
                     copy.SetActive(true);
                     copy.transform.localScale = new Vector3(scale * ObiPlan.Squeeze, scale, scale);
@@ -152,7 +170,7 @@ namespace PachiMoji
                 for (int j = 0; j < starCount; j++)
                 {
                     var holder = new GameObject("Star");
-                    holder.transform.SetParent(st.root.transform, false);
+                    holder.transform.SetParent(lane.parent, false);
                     var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
                     Object.DestroyImmediate(q.GetComponent<Collider>());
                     q.transform.SetParent(holder.transform, false);
@@ -168,10 +186,10 @@ namespace PachiMoji
 
             // 写真：帯の奥に、書き出しの枠（9:16）を覆う板
             st.frameW = 2 * halfW * (PhotoZ + dist) / dist;
-            if (settings.ObiGreen)
+            if (settings.ObiBlueBack)
             {
-                // グリーンバック：背景は緑一色（写真・模様は出さない。動画編集で緑を抜いて重ねる）
-                st.cam.backgroundColor = GreenBack;
+                // ブルーバック：背景は青一色（写真・模様は出さない。動画編集で青を抜いて重ねる）
+                st.cam.backgroundColor = BlueBack;
             }
             else if (photo != null)
             {
@@ -227,21 +245,36 @@ namespace PachiMoji
             photoQuad.localScale = new Vector3(size.x, size.y, 1);
         }
 
-        /// <summary>グリーンバックの緑（動画編集の「クロマキー」で抜きやすい純な緑）</summary>
-        public static readonly Color GreenBack = new Color(0, 1, 0, 1);
+        /// <summary>ブルーバックの青（動画編集の「クロマキー」で抜く。金の字の反対の色なので、字のまわりの光のにじみが字に近い色にならない）</summary>
+        public static readonly Color BlueBack = new Color(0f, 0.3f, 1f, 1);
+
+        readonly Transform[] laneOuter = new Transform[2];
+        readonly Vector3[] lanePivot = new Vector3[2];
+
+        /// <summary>列（0＝上・1＝下）のずらし（画面の高さ 10 の単位）と大きさを変える。組み立て直さずに動かす</summary>
+        public void SetLaneFit(int lane, Vector2 offset, float scale)
+        {
+            if (laneOuter[lane] == null) return;
+            laneOuter[lane].localPosition = lanePivot[lane] + (Vector3)EffectSettings.ClampObiOffset(offset);
+            laneOuter[lane].localScale = Vector3.one * EffectSettings.ClampObiScale(scale);
+        }
+
+        /// <summary>画面の縦の長さ（0〜1）を、帯の動く単位に直す倍率</summary>
+        public float UnitsPerScreenHeight => 2 * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * -camPos.z;
 
         public bool HasPhoto => photoQuad != null;
         public float PhotoAspect => photoAspect;
 
-        Lane MakeLane(Vector3[] pts, int dir, float halfW, float halfH, float dist, int wordChars)
+        Lane MakeLane(Vector3[] pts, int dir, float halfW, float halfH, float dist, int wordChars, Vector3 pivot, Vector2 offset, float scale)
         {
             // 画面の外へ文字1.5個ぶんまでを残す
             float margin = ObiPlan.LetterH * 1.5f;
             int first = -1, last = -1;
             for (int i = 0; i < pts.Length; i++)
             {
-                float k = dist / (pts[i].z + dist);
-                bool vis = Mathf.Abs(pts[i].x * k) <= halfW + margin && Mathf.Abs(pts[i].y * k) <= halfH + margin;
+                var q = pivot + (Vector3)offset + (pts[i] - pivot) * scale;   // 指で合わせたあとの位置で、見えるかを決める
+                float k = dist / (q.z + dist);
+                bool vis = Mathf.Abs(q.x * k) <= halfW + margin * scale && Mathf.Abs(q.y * k) <= halfH + margin * scale;
                 if (!vis) continue;
                 if (first < 0) first = i;
                 last = i;

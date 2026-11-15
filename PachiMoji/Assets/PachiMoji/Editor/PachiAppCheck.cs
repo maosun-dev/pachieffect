@@ -127,10 +127,10 @@ namespace PachiMoji.EditorTools
                 Debug.Log($"[PachiAppCheck] 帯の組み立て直しの前後 物 {go0}→{go1} 材質 {mat0}→{mat1} メッシュ {mesh0}→{mesh1}");
                 Expect(go1 == go0 && mat1 == mat0 && mesh1 == mesh0, "帯を組み立て直しても物が残らない");
                 {
-                    // グリーンバック：写真があっても背景は緑一色
+                    // ブルーバック：写真があっても背景は青一色
                     var gfx = new ObiEffect();
-                    gfx.Build(new[] { "定時" }, 9f / 16, new EffectSettings { EffectId = "obi", ObiGreen = true });
-                    Expect(gfx.Camera.backgroundColor == ObiStage.GreenBack && !gfx.HasPhoto, "グリーンバックは緑一色で写真を出さない");
+                    gfx.Build(new[] { "定時" }, 9f / 16, new EffectSettings { EffectId = "obi", ObiBlueBack = true });
+                    Expect(gfx.Camera.backgroundColor == ObiStage.BlueBack && !gfx.HasPhoto, "ブルーバックは青一色で写真を出さない");
                     gfx.Dispose();
                 }
                 CheckPhoto();
@@ -302,6 +302,8 @@ namespace PachiMoji.EditorTools
                         "終わりの画面では演出・写真のボタンは出ない"), new EffectSettings { EffectId = "obi" });
                 ShotEffectPick(720, 1560, Path.Combine(outDir, "effect_pick.png"));
                 ShotPhotoAdjust(720, 1560, Path.Combine(outDir, "photo_adjust.png"));
+                ShotMain(720, 1560, Path.Combine(outDir, "main_effect_obi_band.png"), "定時", "退社", AppState.Idle, ui =>
+                    Expect(ui.BandButton.GetComponent<CanvasGroup>().interactable, "帯の待ち：帯を合わせるボタン"), new EffectSettings { EffectId = "obi" });
 
                 // 広告：追跡の許可（ATT）の部品は iPhone だけ。手元（Editor）では広告を動かさず、ごほうびは見終えた扱い
                 var att = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiTracking.mm") as PluginImporter;

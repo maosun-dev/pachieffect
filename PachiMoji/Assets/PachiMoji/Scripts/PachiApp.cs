@@ -31,6 +31,7 @@ namespace PachiMoji
         ShopScreen shopUi;
         EffectPickScreen effectUi;
         PhotoAdjustView photoUi;
+        BandAdjustView bandUi;
         ICover cover;   // いま開いている・閉じかけている上の画面
         Camera uiCam;
         AppState state;
@@ -64,6 +65,10 @@ namespace PachiMoji
             photoUi.Change.onClick.AddListener(PickPhoto);
             ui.EffectButton.onClick.AddListener(OpenEffectPick);
             ui.PhotoButton.onClick.AddListener(OnPhotoButton);
+            bandUi = BandAdjustView.Build(root, Screen.safeArea, ScreenPx);
+            bandUi.Moved += (lane, o, z) => (stage.Effect as ObiEffect)?.SetLaneFit(lane, o, z);
+            bandUi.Done.onClick.AddListener(BandDone);
+            ui.BandButton.onClick.AddListener(OpenBandAdjust);
             ui.Line1.text = PlayerPrefs.GetString(WordsKey1, "定時");
             ui.Line2.text = PlayerPrefs.GetString(WordsKey2, "退社");
             ui.Line1.onValueChanged.AddListener(_ => Validate());
@@ -136,6 +141,7 @@ namespace PachiMoji
                 case AppState.Shop:
                 case AppState.EffectPick:
                 case AppState.PhotoAdjust:
+                case AppState.BandAdjust:
                     idleT = Mathf.Repeat(idleT + dt, 1000f);
                     fx.Idle(idleT);
                     break;
@@ -308,7 +314,8 @@ namespace PachiMoji
             string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
             + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom
-            + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiGreen;
+            + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiBlueBack
+            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale;
 
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()
@@ -366,7 +373,7 @@ namespace PachiMoji
         static float Smooth(float x) => x * x * (3 - 2 * x);
 
         // 舞台を再生の範囲いっぱいに描く状態（再生・終わり・写真を合わせる）
-        static bool FullStage(AppState s) => s == AppState.Playing || s == AppState.Finished || s == AppState.PhotoAdjust;
+        static bool FullStage(AppState s) => s == AppState.Playing || s == AppState.Finished || s == AppState.PhotoAdjust || s == AppState.BandAdjust;
 
         // ───────── 演出を選ぶ・写真 ─────────
 
@@ -459,6 +466,28 @@ namespace PachiMoji
             settings.PhotoZoom = 1;
             settings.Save();
             ClosePhotoAdjust();
+        }
+
+        // 帯の位置と大きさを合わせる画面
+        void OpenBandAdjust()
+        {
+            if (state != AppState.Idle || sinkDir != 0 || !(stage.Effect is ObiEffect obi)) return;
+            EventSystem.current?.SetSelectedGameObject(null);
+            ui.SetDeckSink(1);
+            SetState(AppState.BandAdjust);
+            bandUi.Begin(settings.ObiTopOffset, settings.ObiTopScale, settings.ObiBottomOffset, settings.ObiBottomScale, obi.UnitsPerScreenHeight);
+        }
+
+        void BandDone()
+        {
+            if (state != AppState.BandAdjust) return;
+            settings.ObiTopOffset = bandUi.Offset(0); settings.ObiTopScale = bandUi.Scale(0);
+            settings.ObiBottomOffset = bandUi.Offset(1); settings.ObiBottomScale = bandUi.Scale(1);
+            settings.Save();
+            bandUi.Show(false);
+            ui.SetDeckSink(0);
+            SetState(AppState.Idle);
+            Rebuild();   // 見える範囲が変わるので組み立て直す（帯の端が画面に出ないように）
         }
 
         void ClosePhotoAdjust()

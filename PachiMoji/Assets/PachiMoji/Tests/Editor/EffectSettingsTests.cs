@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiGreen" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -231,11 +231,37 @@ namespace PachiMoji.Tests
         }
 
         [Test]
-        public void グリーンバックの既定はなしで保存できる()
+        public void ブルーバックの既定はなしで保存できる()
         {
-            Assert.IsFalse(EffectSettings.Load(P).ObiGreen);
-            new EffectSettings { ObiGreen = true }.Save(P);
-            Assert.IsTrue(EffectSettings.Load(P).ObiGreen);
+            Assert.IsFalse(EffectSettings.Load(P).ObiBlueBack);
+            new EffectSettings { ObiBlueBack = true }.Save(P);
+            Assert.IsTrue(EffectSettings.Load(P).ObiBlueBack);
+        }
+
+        [Test]
+        public void 帯の位置と大きさの既定と保存()
+        {
+            var d = EffectSettings.Load(P);
+            Assert.AreEqual(Vector2.zero, d.ObiTopOffset);
+            Assert.AreEqual(1f, d.ObiTopScale);
+            Assert.AreEqual(Vector2.zero, d.ObiBottomOffset);
+            Assert.AreEqual(1f, d.ObiBottomScale);
+            new EffectSettings { ObiTopOffset = new Vector2(0.5f, 1.2f), ObiTopScale = 1.3f, ObiBottomOffset = new Vector2(-0.4f, 0), ObiBottomScale = 0.8f }.Save(P);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(1.2f, s.ObiTopOffset.y, 1e-5f);
+            Assert.AreEqual(1.3f, s.ObiTopScale, 1e-5f);
+            Assert.AreEqual(-0.4f, s.ObiBottomOffset.x, 1e-5f);
+            Assert.AreEqual(0.8f, s.ObiBottomScale, 1e-5f);
+        }
+
+        [Test]
+        public void 帯の大きさと位置は範囲に収める()
+        {
+            Assert.AreEqual(EffectSettings.ObiScaleMin, EffectSettings.ClampObiScale(0.1f));
+            Assert.AreEqual(EffectSettings.ObiScaleMax, EffectSettings.ClampObiScale(9f));
+            var o = EffectSettings.ClampObiOffset(new Vector2(99, -99));
+            Assert.AreEqual(EffectSettings.ObiOffsetMax, o.x);
+            Assert.AreEqual(-EffectSettings.ObiOffsetMax, o.y);
         }
     }
 }

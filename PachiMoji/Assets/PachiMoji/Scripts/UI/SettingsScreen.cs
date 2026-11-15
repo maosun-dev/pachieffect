@@ -96,8 +96,8 @@ namespace PachiMoji
                 i => settings.ObiGlow = (ObiGlow)i);
             m.Choice(parent, ref y, "光の量", new[] { "少なめ", "ふつう", "多め" }, null, (int)settings.ObiGlowAmount, 104,
                 i => settings.ObiGlowAmount = (ObiGlowAmount)i);
-            m.Choice(parent, ref y, "グリーンバック（背景を緑一色に）", new[] { "なし", "あり" }, null, settings.ObiGreen ? 1 : 0, 150,
-                i => settings.ObiGreen = i == 1);
+            m.Choice(parent, ref y, "ブルーバック（背景を青一色に）", new[] { "なし", "あり" }, null, settings.ObiBlueBack ? 1 : 0, 150,
+                i => settings.ObiBlueBack = i == 1);
             m.obiH = -y + 24;
             m.SetEffect(settings.EffectId);
 

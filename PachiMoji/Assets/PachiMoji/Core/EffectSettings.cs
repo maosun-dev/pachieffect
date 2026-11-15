@@ -32,7 +32,14 @@ namespace PachiMoji
         public ObiRed ObiRed = ObiRed.None;           // 激アツの帯：厚みの奥の赤み
         public ObiGlow ObiGlow = ObiGlow.None;        // 激アツの帯：文字の後ろの光（なし・金の光・炎）
         public ObiGlowAmount ObiGlowAmount = ObiGlowAmount.Mid;   // 激アツの帯：光の量（広さと明るさ）
-        public bool ObiGreen;                         // 激アツの帯：背景を緑一色にする（グリーンバック。写真・模様は出さない）
+        public bool ObiBlueBack;                         // 激アツの帯：背景を青一色にする（ブルーバック。写真・模様は出さない。金の字と反対の色で抜きやすい）
+        // 激アツの帯：上の列・下の列のずらし（画面の高さを 10 とする単位）と大きさ（指で合わせる）
+        public Vector2 ObiTopOffset, ObiBottomOffset;
+        public float ObiTopScale = 1, ObiBottomScale = 1;
+
+        public const float ObiScaleMin = 0.5f, ObiScaleMax = 2f, ObiOffsetMax = 6f;
+        public static float ClampObiScale(float s) => Mathf.Clamp(s, ObiScaleMin, ObiScaleMax);
+        public static Vector2 ClampObiOffset(Vector2 o) => new Vector2(Mathf.Clamp(o.x, -ObiOffsetMax, ObiOffsetMax), Mathf.Clamp(o.y, -ObiOffsetMax, ObiOffsetMax));
 
         /// <summary>光の帯の幅の倍率（少なめは字の後ろに隠れるくらい、多めは字の上下へはみ出す）</summary>
         public float ObiGlowWidth => ObiGlowAmount switch { ObiGlowAmount.Low => 1f, ObiGlowAmount.High => 1.9f, _ => 1.45f };
@@ -79,7 +86,11 @@ namespace PachiMoji
             s.ObiRed = (ObiRed)Pick(prefix + "obiRed", (int)d.ObiRed, 2);
             s.ObiGlow = (ObiGlow)Pick(prefix + "obiGlow", (int)d.ObiGlow, 2);
             s.ObiGlowAmount = (ObiGlowAmount)Pick(prefix + "obiGlowAmount", (int)d.ObiGlowAmount, 2);
-            s.ObiGreen = PlayerPrefs.GetInt(prefix + "obiGreen", 0) != 0;
+            s.ObiBlueBack = PlayerPrefs.GetInt(prefix + "obiBlueBack", 0) != 0;
+            s.ObiTopOffset = ClampObiOffset(new Vector2(PlayerPrefs.GetFloat(prefix + "obiTopX", 0), PlayerPrefs.GetFloat(prefix + "obiTopY", 0)));
+            s.ObiBottomOffset = ClampObiOffset(new Vector2(PlayerPrefs.GetFloat(prefix + "obiBotX", 0), PlayerPrefs.GetFloat(prefix + "obiBotY", 0)));
+            s.ObiTopScale = ClampObiScale(PlayerPrefs.GetFloat(prefix + "obiTopS", 1));
+            s.ObiBottomScale = ClampObiScale(PlayerPrefs.GetFloat(prefix + "obiBotS", 1));
             return s;
         }
 
@@ -102,7 +113,13 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "obiRed", (int)ObiRed);
             PlayerPrefs.SetInt(prefix + "obiGlow", (int)ObiGlow);
             PlayerPrefs.SetInt(prefix + "obiGlowAmount", (int)ObiGlowAmount);
-            PlayerPrefs.SetInt(prefix + "obiGreen", ObiGreen ? 1 : 0);
+            PlayerPrefs.SetInt(prefix + "obiBlueBack", ObiBlueBack ? 1 : 0);
+            PlayerPrefs.SetFloat(prefix + "obiTopX", ObiTopOffset.x);
+            PlayerPrefs.SetFloat(prefix + "obiTopY", ObiTopOffset.y);
+            PlayerPrefs.SetFloat(prefix + "obiTopS", ObiTopScale);
+            PlayerPrefs.SetFloat(prefix + "obiBotX", ObiBottomOffset.x);
+            PlayerPrefs.SetFloat(prefix + "obiBotY", ObiBottomOffset.y);
+            PlayerPrefs.SetFloat(prefix + "obiBotS", ObiBottomScale);
             PlayerPrefs.Save();
         }
 

@@ -38,7 +38,9 @@ namespace PachiMoji
             touch.anchorMin = Vector2.zero; touch.anchorMax = Vector2.one;
             touch.offsetMin = touch.offsetMax = Vector2.zero;
             touch.gameObject.AddComponent<Image>().color = Color.clear;
-            touch.gameObject.AddComponent<PhotoGesture>().View = m;
+            var gesture = touch.gameObject.AddComponent<PhotoGesture>();
+            gesture.Drag = d => m.DragBy(d);
+            gesture.Zoom = k => m.ZoomBy(k);
 
             // 枠の外を暗く（上と下。枠は画面の幅いっぱいなので左右は無い）
             m.dimTop = Dim(m.panel, "DimTop");
@@ -164,21 +166,22 @@ namespace PachiMoji
         }
     }
 
-    /// <summary>写真を合わせる画面の指の動き：1本でドラッグ、2本でピンチ（手元ではマウスのホイールで大きさ）</summary>
+    /// <summary>合わせる画面の指の動き：1本でドラッグ、2本でピンチ（手元ではマウスのホイールで大きさ）。写真と帯で使う</summary>
     public class PhotoGesture : MonoBehaviour, IDragHandler
     {
-        public PhotoAdjustView View;
+        public Action<Vector2> Drag;
+        public Action<float> Zoom;
         float pinchDist;
 
         public void OnDrag(PointerEventData e)
         {
             if (TouchCount() >= 2) return;   // 2本のときはピンチだけ
-            View.DragBy(e.delta);
+            Drag?.Invoke(e.delta);
         }
 
         void Update()
         {
-            if (View == null) return;
+            if (Drag == null) return;
             var ts = Touchscreen.current;
             if (ts != null && TouchCount() >= 2)
             {
@@ -190,7 +193,7 @@ namespace PachiMoji
                     if (++n == 2) break;
                 }
                 float d = Vector2.Distance(a, b);
-                if (pinchDist > 1 && d > 1) View.ZoomBy(d / pinchDist);
+                if (pinchDist > 1 && d > 1) Zoom?.Invoke(d / pinchDist);
                 pinchDist = d;
             }
             else pinchDist = 0;
@@ -198,7 +201,7 @@ namespace PachiMoji
             if (mouse != null)
             {
                 float s = mouse.scroll.ReadValue().y;
-                if (Mathf.Abs(s) > 0.01f) View.ZoomBy(1 + Mathf.Sign(s) * 0.06f);
+                if (Mathf.Abs(s) > 0.01f) Zoom?.Invoke(1 + Mathf.Sign(s) * 0.06f);
             }
         }
 

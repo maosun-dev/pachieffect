@@ -37,6 +37,10 @@ namespace PachiMoji
 
         /// <summary>写真が入っているか・写真の横÷縦</summary>
         public bool HasPhoto => stage != null && stage.HasPhoto;
+
+        /// <summary>列（0＝上・1＝下）を指で合わせるあいだ、組み立て直さずに動かす</summary>
+        public void SetLaneFit(int lane, Vector2 offset, float scale) => stage?.SetLaneFit(lane, offset, scale);
+        public float UnitsPerScreenHeight => stage != null ? stage.UnitsPerScreenHeight : 1;
         public float PhotoAspect => stage != null ? stage.PhotoAspect : 1;
 
         public void Dispose()
