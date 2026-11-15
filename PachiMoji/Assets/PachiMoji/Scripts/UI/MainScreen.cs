@@ -16,6 +16,7 @@ namespace PachiMoji
 
         public TMP_InputField Line1, Line2;
         public Button Push, Again, Export, ChangeWords, Gear, ShopButton;
+        public Button EffectButton, PhotoButton;            // 左上の演出（待ち）・舞台の左下の写真（激アツの帯のときだけ）
         public TMP_Text Notice;
         public RawImage ExportView;                          // 書き出している板（9:16）を範囲に収めて見せる
         public Button CancelExport, SavePhoto, Share, CloseExport;
@@ -23,7 +24,8 @@ namespace PachiMoji
         public TMP_Text AdDiag;                              // テスト用の版だけ：広告の段階（いちばん上に小さく）                           // 終わり・できたの画面の知らせ（失敗の直し方・保存しました）
         public RectTransform StageIdleArea, StagePlayArea;   // 舞台の絵を置く範囲（待ち・再生）
         public RawImage StageView;                           // 舞台の絵を貼る板（StageScreen が使う）
-        RectTransform deck; CanvasGroup deckGroup, endGroup, gearGroup, shopGroup, changeGroup;
+        RectTransform deck; CanvasGroup deckGroup, endGroup, gearGroup, shopGroup, changeGroup, effectGroup, photoGroup;
+        TMP_Text effectLabel, photoLabel; bool photoOn, idleNow;
         CanvasGroup runGroup, doneGroup, closeGroup, endNoticeGroup;
         TMP_Text percentLabel, saveLabel; RectTransform progressFill; float progressWidth;
         Image dome; TMP_Text pushLabel;
@@ -136,6 +138,16 @@ namespace PachiMoji
             m.ChangeWords = PlateButton(safe, "言葉を変える", new Vector2(0, 1), new Vector2(76, -32), new Vector2(136, 44), UiTheme.Body, 15, UiTheme.Chrome);
             m.changeGroup = m.ChangeWords.gameObject.AddComponent<CanvasGroup>();
 
+            // 左上：演出を選ぶ（待ちのあいだだけ。終わりの画面の「言葉を変える」と同じ場所）。字は今の演出の名前
+            m.EffectButton = PlateButton(safe, "演出", new Vector2(0, 1), new Vector2(76, -32), new Vector2(136, 44), UiTheme.Display, 15, UiTheme.Chrome);
+            m.effectLabel = m.EffectButton.GetComponentInChildren<TMP_Text>();
+            m.effectGroup = m.EffectButton.gameObject.AddComponent<CanvasGroup>();
+
+            // 舞台の左下：写真を入れる・合わせる（激アツの帯のときだけ）
+            m.PhotoButton = PlateButton(m.StageIdleArea, "写真を入れる", new Vector2(0, 0), new Vector2(84, 32), new Vector2(148, 40), UiTheme.Body, 14, UiTheme.Chrome);
+            m.photoLabel = m.PhotoButton.GetComponentInChildren<TMP_Text>();
+            m.photoGroup = m.PhotoButton.gameObject.AddComponent<CanvasGroup>();
+
             // 終わったあと：もう一回・書き出す
             var end = Rect(safe, "EndBar");
             Bottom(end, UiTheme.BannerHeight, 112);
@@ -166,9 +178,12 @@ namespace PachiMoji
         /// <summary>状態に合わせて部品を出し分ける（台の沈み込みは SetDeckSink で別に動かす）</summary>
         public void ShowState(AppState s)
         {
-            bool idle = s == AppState.Idle || s == AppState.Settings || s == AppState.Shop;
+            bool idle = s == AppState.Idle || s == AppState.Settings || s == AppState.Shop || s == AppState.EffectPick;
             Show(gearGroup, idle);
             Show(shopGroup, idle);
+            Show(effectGroup, idle);
+            idleNow = idle;
+            Show(photoGroup, idle && photoOn);
             bool exporting = s == AppState.Exporting, exported = s == AppState.Exported;
             Show(endGroup, s == AppState.Finished);
             Show(changeGroup, s == AppState.Finished);
@@ -277,6 +292,17 @@ namespace PachiMoji
             SavePhoto.interactable = !saved;
             saveLabel.color = saved ? UiTheme.Muted : UiTheme.Chrome;
             EndNotice.text = saved ? "写真に保存しました" : "";
+        }
+
+        /// <summary>左上の演出のボタンの字（今の演出の名前）</summary>
+        public void SetEffectName(string name) => effectLabel.text = name;
+
+        /// <summary>写真のボタン：出すか（激アツの帯のとき）と、写真が入っているか（字が変わる）</summary>
+        public void SetPhotoButton(bool visible, bool hasPhoto)
+        {
+            photoOn = visible;
+            photoLabel.text = hasPhoto ? "写真を合わせる" : "写真を入れる";
+            Show(photoGroup, idleNow && photoOn);
         }
 
         /// <summary>台の沈み具合（0＝いつもの位置、1＝下へ沈んで見えない）</summary>

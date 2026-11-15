@@ -279,6 +279,19 @@ namespace PachiMoji.EditorTools
                 ShotMain(720, 1560, Path.Combine(outDir, "main_9x19_topright.png"), "定時", "退社", AppState.Idle, ui =>
                     Expect(ui.ShopButton != null && ui.ShopButton.GetComponent<CanvasGroup>().interactable, "待ちの画面で買い物を押せる"));
 
+                // 演出を選ぶ：左上の演出のボタン、演出を選ぶ画面、帯の待ちの画面（写真なし・あり）、写真を合わせる画面
+                ShotMain(720, 1560, Path.Combine(outDir, "main_effect_oudou.png"), "定時", "退社", AppState.Idle, ui =>
+                    Expect(ui.EffectButton.GetComponent<CanvasGroup>().interactable && !ui.PhotoButton.GetComponent<CanvasGroup>().interactable,
+                        "王道昇格の待ち：演出のボタンを押せて、写真のボタンは無い"));
+                ShotMain(720, 1560, Path.Combine(outDir, "main_effect_obi.png"), "定時", "退社", AppState.Idle, ui =>
+                    Expect(ui.PhotoButton.GetComponent<CanvasGroup>().interactable && ui.PhotoButton.GetComponentInChildren<TMPro.TMP_Text>().text == "写真を入れる",
+                        "帯の待ち：写真を入れるボタン"), new EffectSettings { EffectId = "obi" });
+                ShotMain(720, 1560, Path.Combine(outDir, "main_finished_obi.png"), "定時", "退社", AppState.Finished, ui =>
+                    Expect(!ui.EffectButton.GetComponent<CanvasGroup>().interactable && !ui.PhotoButton.GetComponent<CanvasGroup>().interactable,
+                        "終わりの画面では演出・写真のボタンは出ない"), new EffectSettings { EffectId = "obi" });
+                ShotEffectPick(720, 1560, Path.Combine(outDir, "effect_pick.png"));
+                ShotPhotoAdjust(720, 1560, Path.Combine(outDir, "photo_adjust.png"));
+
                 // 広告：追跡の許可（ATT）の部品は iPhone だけ。手元（Editor）では広告を動かさず、ごほうびは見終えた扱い
                 var att = PluginImporter.GetAtPath("Assets/Plugins/iOS/PachiTracking.mm") as PluginImporter;
                 Expect(att != null && att.GetCompatibleWithPlatform(BuildTarget.iOS) && !att.GetCompatibleWithEditor()
@@ -370,7 +383,7 @@ namespace PachiMoji.EditorTools
         /// メイン画面を1枚に撮る（PachiApp と同じ部品・同じ確かめ方で）。
         /// 縦長（9:19.5）のときは、ノッチ（上 47pt）とホームバー（下 34pt）を避けた範囲に置く
         /// </summary>
-        static void ShotMain(int w, int h, string path, string l1, string l2, AppState state, Action<MainScreen> extra = null)
+        static void ShotMain(int w, int h, string path, string l1, string l2, AppState state, Action<MainScreen> extra = null, EffectSettings fx = null)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             float pt = w / UiTheme.ReferenceSize.x;
@@ -392,7 +405,11 @@ namespace PachiMoji.EditorTools
             var stage = new StageScreen(ui, uiCam);
             if (check.CanPlay)
             {
-                stage.Build(check.Lines, new EffectSettings(), new Vector2(w, h));
+                fx ??= new EffectSettings();
+                stage.Build(check.Lines, fx, new Vector2(w, h));
+                var entry = EffectCatalog.Get(fx.EffectId);
+                ui.SetEffectName(entry.Name);
+                ui.SetPhotoButton(entry.Id == "obi", !string.IsNullOrEmpty(fx.PhotoPath));
                 stage.SetFull(state != AppState.Idle);
                 if (state == AppState.Idle) stage.Effect.Idle(1f); else stage.Effect.Evaluate(stage.Effect.Duration);
                 stage.Frame();
@@ -434,6 +451,64 @@ namespace PachiMoji.EditorTools
             e.Dispose();
             board.Release();
             UnityEngine.Object.DestroyImmediate(board);
+        }
+
+        static void ShotEffectPick(int w, int h, string path)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            float pt = w / UiTheme.ReferenceSize.x;
+            var safe = new Rect(0, 34 * pt, w, h - (47 + 34) * pt);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = MainScreen.CreateUiCamera();
+            uiCam.targetTexture = rt;
+            var screen = EffectPickScreen.Build(MainScreen.CreateCanvas(uiCam), safe, new Vector2(w, h));
+            screen.Show(true);
+            screen.SetSlide(0);
+            screen.SetCurrent("obi");
+            string picked = null;
+            screen.Picked += id => picked = id;
+            screen.PressForCheck("oudou");
+            Expect(picked == "oudou", "演出の札を押すと、その演出が選ばれる");
+            Canvas.ForceUpdateCanvases();
+            RenderUi(rt, path, uiCam);
+        }
+
+        // 写真を合わせる画面：舞台を広げ、確認用の写真（顔の位置の丸）を入れた帯の上に、書き出しの枠と下のボタン
+        static void ShotPhotoAdjust(int w, int h, string path)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            string tmp = Path.Combine(Path.GetTempPath(), "pachi_adjust.jpg");
+            var tex = ObiCapture.TestPhoto();
+            File.WriteAllBytes(tmp, tex.EncodeToJPG(90));
+            UnityEngine.Object.DestroyImmediate(tex);
+            float pt = w / UiTheme.ReferenceSize.x;
+            var safe = new Rect(0, 34 * pt, w, h - (47 + 34) * pt);
+            var rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var uiCam = MainScreen.CreateUiCamera();
+            uiCam.targetTexture = rt;
+            var root = MainScreen.CreateCanvas(uiCam);
+            var ui = MainScreen.Build(root, safe, new Vector2(w, h));
+            var view = PhotoAdjustView.Build(root, safe, new Vector2(w, h), ui.StagePlayArea);
+            ui.SetDeckSink(1);
+            ui.ShowState(AppState.PhotoAdjust);
+            Canvas.ForceUpdateCanvases();
+            var stage = new StageScreen(ui, uiCam);
+            var fx = new EffectSettings { EffectId = "obi", PhotoPath = tmp, PhotoOffset = new Vector2(0, 0.1f), PhotoZoom = 1.2f };
+            stage.Build(new[] { "定時", "退社" }, fx, new Vector2(w, h));
+            stage.SetFull(true);
+            var obi = (ObiEffect)stage.Effect;
+            Expect(obi.HasPhoto, "合わせる画面の帯に写真が入る");
+            view.Moved += (o, z) => obi.SetPhotoFit(o, z);
+            view.Begin(fx.PhotoOffset, fx.PhotoZoom, obi.PhotoAspect);
+            view.SetFit(new Vector2(9, 9), 9);
+            Expect(Mathf.Approximately(view.Zoom, PhotoFit.MaxZoom), "大きくしすぎても 4 倍で止まる");
+            view.SetFit(fx.PhotoOffset, fx.PhotoZoom);
+            obi.Idle(1f);
+            stage.Frame();
+            stage.Effect.Camera.Render();
+            RenderUi(rt, path, uiCam);
+            stage.Dispose();
+            File.Delete(tmp);
         }
 
         static void ShotShop(int w, int h, string path, Action<ShopScreen> check)

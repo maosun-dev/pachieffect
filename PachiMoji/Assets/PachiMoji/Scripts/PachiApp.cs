@@ -29,6 +29,8 @@ namespace PachiMoji
         MainScreen ui;
         SettingsScreen settingsUi;
         ShopScreen shopUi;
+        EffectPickScreen effectUi;
+        PhotoAdjustView photoUi;
         ICover cover;   // いま開いている・閉じかけている上の画面
         Camera uiCam;
         AppState state;
@@ -51,7 +53,17 @@ namespace PachiMoji
             settingsUi.Back.onClick.AddListener(CloseSettings);
             shopUi = ShopScreen.Build(root, Screen.safeArea, ScreenPx);
             shopUi.Back.onClick.AddListener(CloseShop);
+            effectUi = EffectPickScreen.Build(root, Screen.safeArea, ScreenPx);
+            effectUi.Back.onClick.AddListener(CloseEffectPick);
+            effectUi.Picked += OnEffectPicked;
             stage = new StageScreen(ui, uiCam);
+            photoUi = PhotoAdjustView.Build(root, Screen.safeArea, ScreenPx, ui.StagePlayArea);
+            photoUi.Moved += (o, z) => (stage.Effect as ObiEffect)?.SetPhotoFit(o, z);
+            photoUi.Done.onClick.AddListener(PhotoDone);
+            photoUi.Remove.onClick.AddListener(PhotoRemove);
+            photoUi.Change.onClick.AddListener(PickPhoto);
+            ui.EffectButton.onClick.AddListener(OpenEffectPick);
+            ui.PhotoButton.onClick.AddListener(OnPhotoButton);
             ui.Line1.text = PlayerPrefs.GetString(WordsKey1, "定時");
             ui.Line2.text = PlayerPrefs.GetString(WordsKey2, "退社");
             ui.Line1.onValueChanged.AddListener(_ => Validate());
@@ -84,6 +96,7 @@ namespace PachiMoji
 
             Canvas.ForceUpdateCanvases();
             Rebuild();
+            RefreshEffectUi();   // 言葉が空で舞台を組まないときも、演出の名前は出す
             SetState(AppState.Idle);
         }
 
@@ -121,6 +134,8 @@ namespace PachiMoji
                 case AppState.Idle:
                 case AppState.Settings:
                 case AppState.Shop:
+                case AppState.EffectPick:
+                case AppState.PhotoAdjust:
                     idleT = Mathf.Repeat(idleT + dt, 1000f);
                     fx.Idle(idleT);
                     break;
@@ -312,7 +327,8 @@ namespace PachiMoji
                 PlayerPrefs.Save();
             }
             stage.SetVisible(true);
-            stage.SetFull(state == AppState.Playing || state == AppState.Finished);
+            stage.SetFull(FullStage(state));
+            RefreshEffectUi();
             if (state == AppState.Idle) stage.Effect.Idle(idleT);
             stage.Frame();
         }
@@ -338,6 +354,110 @@ namespace PachiMoji
         }
 
         static float Smooth(float x) => x * x * (3 - 2 * x);
+
+        // 舞台を再生の範囲いっぱいに描く状態（再生・終わり・写真を合わせる）
+        static bool FullStage(AppState s) => s == AppState.Playing || s == AppState.Finished || s == AppState.PhotoAdjust;
+
+        // ───────── 演出を選ぶ・写真 ─────────
+
+        // 左上の演出の名前と、写真のボタン（激アツの帯のときだけ）を今の設定に合わせる
+        void RefreshEffectUi()
+        {
+            var e = EffectCatalog.Get(settings.EffectId);
+            ui.SetEffectName(e.Name);
+            ui.SetPhotoButton(e.Id == "obi", !string.IsNullOrEmpty(settings.PhotoPath));
+        }
+
+        void OpenEffectPick()
+        {
+            if (!OpenCover(effectUi, AppState.EffectPick)) return;
+            effectUi.SetCurrent(settings.EffectId);
+        }
+
+        void OnEffectPicked(string id)
+        {
+            if (state != AppState.EffectPick) return;
+            settings.EffectId = id;
+            settings.Save();
+            CloseEffectPick();
+        }
+
+        void CloseEffectPick()
+        {
+            if (state != AppState.EffectPick) return;
+            slideDir = 1;
+            SetState(AppState.Idle);
+            Rebuild();   // 演出が変わっていれば組み立て直す
+        }
+
+        // 「写真を入れる／合わせる」：写真が無ければ選ぶ、あれば合わせる画面へ
+        void OnPhotoButton()
+        {
+            if (state != AppState.Idle || sinkDir != 0) return;
+            if (string.IsNullOrEmpty(settings.PhotoPath)) PickPhoto();
+            else OpenPhotoAdjust();
+        }
+
+        // 写真を選ぶ。選べたら前の写真を消して、合わせる画面へ
+        void PickPhoto()
+        {
+            if (state != AppState.Idle && state != AppState.PhotoAdjust) return;
+            PhotoPicker.Pick((r, path) =>
+            {
+                if (r == PhotoPickResult.Failed) { ui.Notice.text = "写真を読み込めませんでした。別の写真を選んでください"; return; }
+                if (r != PhotoPickResult.Picked) return;
+                string old = settings.PhotoPath;
+                settings.PhotoPath = path;
+                settings.PhotoOffset = Vector2.zero;
+                settings.PhotoZoom = 1;
+                settings.Save();
+                if (!string.IsNullOrEmpty(old) && old != path) PhotoStore.Delete(old);
+                Rebuild();
+                if (state == AppState.PhotoAdjust) BeginPhotoAdjust(); else OpenPhotoAdjust();
+            });
+        }
+
+        void OpenPhotoAdjust()
+        {
+            if (!(stage.Effect is ObiEffect obi) || !obi.HasPhoto) return;
+            EventSystem.current?.SetSelectedGameObject(null);
+            ui.SetDeckSink(1);   // 入力の板と PUSH を隠して、舞台を広げる
+            SetState(AppState.PhotoAdjust);
+            BeginPhotoAdjust();
+        }
+
+        void BeginPhotoAdjust()
+        {
+            if (stage.Effect is ObiEffect obi) photoUi.Begin(settings.PhotoOffset, settings.PhotoZoom, obi.PhotoAspect);
+        }
+
+        void PhotoDone()
+        {
+            if (state != AppState.PhotoAdjust) return;
+            settings.PhotoOffset = photoUi.Offset;
+            settings.PhotoZoom = photoUi.Zoom;
+            settings.Save();
+            ClosePhotoAdjust();
+        }
+
+        void PhotoRemove()
+        {
+            if (state != AppState.PhotoAdjust) return;
+            PhotoStore.Delete(settings.PhotoPath);
+            settings.PhotoPath = "";
+            settings.PhotoOffset = Vector2.zero;
+            settings.PhotoZoom = 1;
+            settings.Save();
+            ClosePhotoAdjust();
+        }
+
+        void ClosePhotoAdjust()
+        {
+            photoUi.Show(false);
+            ui.SetDeckSink(0);
+            SetState(AppState.Idle);
+            Rebuild();
+        }
 
         void OpenSettings()
         {
@@ -387,7 +507,7 @@ namespace PachiMoji
             ui.ShowState(s);
             if (s == AppState.Finished) gateCheckT = 0;   // 終わりの画面に入ったら、すぐ「書き出す」を押せるか決める
             // 舞台の絵を置く範囲：待ちは入力の板より上、再生・終わりはバナーより上の全部
-            stage.SetFull(s == AppState.Playing || s == AppState.Finished);
+            stage.SetFull(FullStage(s));
             stage.Frame();
         }
     }

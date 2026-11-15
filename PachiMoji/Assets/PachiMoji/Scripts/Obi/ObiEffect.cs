@@ -35,6 +35,10 @@ namespace PachiMoji
         /// <summary>写真の位置合わせのあいだ、組み立て直さずに写真だけ動かす</summary>
         public void SetPhotoFit(Vector2 offset, float zoom) => stage?.SetPhotoFit(offset, zoom);
 
+        /// <summary>写真が入っているか・写真の横÷縦</summary>
+        public bool HasPhoto => stage != null && stage.HasPhoto;
+        public float PhotoAspect => stage != null ? stage.PhotoAspect : 1;
+
         public void Dispose()
         {
             stage?.Dispose();

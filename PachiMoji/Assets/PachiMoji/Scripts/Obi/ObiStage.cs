@@ -158,6 +158,7 @@ namespace PachiMoji
         }
 
         public bool HasPhoto => photoQuad != null;
+        public float PhotoAspect => photoAspect;
 
         Lane MakeLane(Vector3[] pts, int dir, float halfW, float halfH, float dist, int wordChars)
         {
