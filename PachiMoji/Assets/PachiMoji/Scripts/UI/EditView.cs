@@ -29,7 +29,9 @@ namespace PachiMoji
         readonly Button[] tabs = new Button[3];
         readonly Image[] tabBars = new Image[3];
         readonly TMP_Text[] tabTexts = new TMP_Text[3];
-        TMP_Text pickText, hint;
+        TMP_Text pickText, hint, busyText;
+        RectTransform busy;
+        float messageUntil;
         public Target Current { get; private set; }
 
         // 写真
@@ -137,9 +139,46 @@ namespace PachiMoji
             m.hEnd = Handle(m.rail, "End", f => m.DragHandle(false, f));
             m.rangeBox.gameObject.SetActive(false);
 
+            // 読み込み中：画面ぜんたいを暗くして、まん中に知らせ（押せなくする）
+            m.busy = MainScreen.Rect(m.panel, "Busy");
+            m.busy.anchorMin = Vector2.zero; m.busy.anchorMax = Vector2.one;
+            m.busy.offsetMin = m.busy.offsetMax = Vector2.zero;
+            m.busy.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.7f);
+            var bt = MainScreen.Rect(m.busy, "Text");
+            MainScreen.Place(bt, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(320, 80));
+            m.busyText = MainScreen.Label(bt, "", UiTheme.Body, 15, UiTheme.Chrome);
+            m.busyText.textWrappingMode = TextWrappingModes.Normal;
+            m.busy.gameObject.AddComponent<BusyDots>().Text = m.busyText;
+            m.busy.gameObject.SetActive(false);
+
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
             m.Show(false);
             return m;
+        }
+
+        /// <summary>読み込み中の知らせ（null で消す）。出ているあいだは画面を押せない</summary>
+        public void SetBusy(string text)
+        {
+            busy.gameObject.SetActive(text != null);
+            if (text != null) busy.GetComponent<BusyDots>().Base = text;
+        }
+
+        /// <summary>動画の準備を待っているか（準備中の知らせを出す）</summary>
+        public bool Waiting { get; private set; }
+        public void SetWaiting(bool on)
+        {
+            if (Waiting == on) return;
+            Waiting = on;
+            SetBusy(on ? "動画を準備中…" : null);
+        }
+
+        /// <summary>上のひとことに、しばらく知らせを出す（読み込めなかったときなど）</summary>
+        public void ShowMessage(string text)
+        {
+            SetBusy(null);
+            Waiting = false;
+            hint.text = text;
+            hint.color = new Color(1f, 0.55f, 0.45f);
         }
 
         // 選んでいるものの印（設定の画面と同じ金の下線）
@@ -206,6 +245,7 @@ namespace PachiMoji
 
         public void Select(Target t)
         {
+            if (hint != null) hint.color = UiTheme.Chrome;
             if (t == Target.Media && !mediaAllowed) t = Target.Top;
             Current = t;
             for (int i = 0; i < 3; i++)
@@ -351,6 +391,23 @@ namespace PachiMoji
             int n = 0;
             foreach (var t in ts.touches) if (t.press.isPressed) n++;
             return n;
+        }
+    }
+
+    /// <summary>読み込み中の知らせの最後の「…」を動かして、止まっていないことを見せる</summary>
+    public class BusyDots : MonoBehaviour
+    {
+        public TMP_Text Text;
+        public string Base = "";
+
+        void Update()
+        {
+            if (Text == null) return;
+            int n = (int)(Time.unscaledTime * 2.5f) % 4;
+            string b = Base.TrimEnd('…');
+            int nl = b.IndexOf('\n');
+            string head = nl >= 0 ? b.Substring(0, nl) : b, tail = nl >= 0 ? b.Substring(nl) : "";
+            Text.text = head.TrimEnd('…') + new string('・', n) + tail;
         }
     }
 

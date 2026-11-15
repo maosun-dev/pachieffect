@@ -17,6 +17,8 @@ namespace PachiMoji
         public string VideoPath => video?.Path;
         public float VideoStart => videoStart;
         public bool HasVideo => video != null;
+        /// <summary>動画を再生できなかった</summary>
+        public bool VideoFailed => video != null && video.Failed;
         /// <summary>動画の全体の長さ（準備ができる前は 0）</summary>
         public float VideoLength => video != null && video.Prepared ? video.Length : 0;
 

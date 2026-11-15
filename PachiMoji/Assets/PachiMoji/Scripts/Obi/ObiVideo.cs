@@ -35,7 +35,8 @@ namespace PachiMoji
             vp = go.AddComponent<VideoPlayer>();
             vp.playOnAwake = false;
             vp.source = VideoSource.Url;
-            vp.url = path;
+            // iPhone でも確実に読めるよう、ファイルの場所は file:// の形で渡す
+            vp.url = new System.Uri(path).AbsoluteUri;
             vp.renderMode = VideoRenderMode.RenderTexture;
             vp.isLooping = false;
             vp.skipOnDrop = true;

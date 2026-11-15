@@ -143,6 +143,17 @@ namespace PachiMoji
                     settings.Save();
                     if (state == AppState.PhotoAdjust) editUi.SetVideo(settings.VideoStart, settings.VideoEnd, obiFx.VideoLength);
                 }
+                // 編集の画面：動画の準備ができるまで「準備中」、読めなかったら知らせる
+                if (state == AppState.PhotoAdjust && obiFx.HasVideo)
+                {
+                    if (obiFx.VideoFailed) editUi.ShowMessage("動画を再生できませんでした。別の動画を選んでください");
+                    else if (obiFx.VideoLength <= 0) editUi.SetWaiting(true);
+                    else
+                    {
+                        if (editUi.Waiting) { editUi.SetImageAspect(obiFx.PhotoAspect); editUi.SetVideo(settings.VideoStart, settings.VideoEnd, obiFx.VideoLength); }
+                        editUi.SetWaiting(false);
+                    }
+                }
             }
             switch (state)
             {
@@ -325,7 +336,7 @@ namespace PachiMoji
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
             + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom + "|" + settings.VideoStart + "-" + settings.VideoEnd
             + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiBlueBack
-            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale + settings.ObiLayout + settings.ObiSpin;
+            + "/" + settings.ObiTopOffset + settings.ObiTopScale + settings.ObiBottomOffset + settings.ObiBottomScale + settings.ObiLayout + settings.ObiSpin + "/" + settings.ExportWide;
 
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()
@@ -453,10 +464,13 @@ namespace PachiMoji
         {
             if (state != AppState.PhotoAdjust) return;
             KeepEdit();
+            // 選び終わるまで（長い動画は変換に時間がかかる）読み込み中と出して、画面を押せなくする
+            editUi.SetBusy("写真・動画を読み込み中…\n長い動画は少し時間がかかります");
             PhotoPicker.Pick((r, path, len) =>
             {
-                if (r == PhotoPickResult.Failed) { ui.Notice.text = "写真・動画を読み込めませんでした。別のものを選んでください"; return; }
-                if (r != PhotoPickResult.Picked || state != AppState.PhotoAdjust) return;
+                editUi.SetBusy(null);
+                if (r == PhotoPickResult.Failed) { editUi.ShowMessage("写真・動画を読み込めませんでした。別のものを選んでください"); return; }
+                if (r != PhotoPickResult.Picked) return;
                 string old = settings.PhotoPath;
                 settings.PhotoPath = path;
                 settings.PhotoOffset = Vector2.zero;
@@ -467,7 +481,7 @@ namespace PachiMoji
                 settings.Save();
                 if (!string.IsNullOrEmpty(old) && old != path) PhotoStore.Delete(old);
                 Rebuild();
-                BeginEdit();
+                if (state == AppState.PhotoAdjust) BeginEdit();
             });
         }
 
