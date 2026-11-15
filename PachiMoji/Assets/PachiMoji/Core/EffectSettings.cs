@@ -32,6 +32,7 @@ namespace PachiMoji
         public ObiRed ObiRed = ObiRed.None;           // 激アツの帯：厚みの奥の赤み
         public ObiGlow ObiGlow = ObiGlow.None;        // 激アツの帯：文字の後ろの光（なし・金の光・炎）
         public ObiGlowAmount ObiGlowAmount = ObiGlowAmount.Mid;   // 激アツの帯：光の量（広さと明るさ）
+        public bool ObiGreen;                         // 激アツの帯：背景を緑一色にする（グリーンバック。写真・模様は出さない）
 
         /// <summary>光の帯の幅の倍率（少なめは字の後ろに隠れるくらい、多めは字の上下へはみ出す）</summary>
         public float ObiGlowWidth => ObiGlowAmount switch { ObiGlowAmount.Low => 1f, ObiGlowAmount.High => 1.9f, _ => 1.45f };
@@ -78,6 +79,7 @@ namespace PachiMoji
             s.ObiRed = (ObiRed)Pick(prefix + "obiRed", (int)d.ObiRed, 2);
             s.ObiGlow = (ObiGlow)Pick(prefix + "obiGlow", (int)d.ObiGlow, 2);
             s.ObiGlowAmount = (ObiGlowAmount)Pick(prefix + "obiGlowAmount", (int)d.ObiGlowAmount, 2);
+            s.ObiGreen = PlayerPrefs.GetInt(prefix + "obiGreen", 0) != 0;
             return s;
         }
 
@@ -100,6 +102,7 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "obiRed", (int)ObiRed);
             PlayerPrefs.SetInt(prefix + "obiGlow", (int)ObiGlow);
             PlayerPrefs.SetInt(prefix + "obiGlowAmount", (int)ObiGlowAmount);
+            PlayerPrefs.SetInt(prefix + "obiGreen", ObiGreen ? 1 : 0);
             PlayerPrefs.Save();
         }
 

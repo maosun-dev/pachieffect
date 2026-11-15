@@ -144,6 +144,14 @@ namespace PachiMoji
                     fx.Evaluate(Mathf.Min(t, fx.Duration));
                     if (t >= fx.Duration) SetState(AppState.Finished);
                     break;
+                case AppState.Finished:
+                    // くり返す演出（激アツの帯）は、終わりの画面でも流し続ける
+                    if (fx.Loops)
+                    {
+                        t = Mathf.Repeat(PlayClock.Step(t, dt), fx.Duration);
+                        fx.Evaluate(t);
+                    }
+                    break;
             }
             stage.Frame();
         }
@@ -266,7 +274,7 @@ namespace PachiMoji
             ui.EndNotice.text = "";
             SetState(AppState.Finished);
             Rebuild();
-            if (stage.Effect != null) stage.Effect.Evaluate(stage.Effect.Duration);
+            if (stage.Effect != null && !stage.Effect.Loops) stage.Effect.Evaluate(stage.Effect.Duration);
             stage.Frame();
         }
 
@@ -300,7 +308,7 @@ namespace PachiMoji
             string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
             + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom
-            + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount;
+            + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount + settings.ObiGreen;
 
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()
@@ -345,7 +353,8 @@ namespace PachiMoji
         void StartPlay()
         {
             t = 0;
-            SetState(AppState.Playing);
+            // くり返す演出は終わりが無いので、すぐ終わりの画面（もう一回・書き出す）にして流し続ける
+            SetState(stage.Effect != null && stage.Effect.Loops ? AppState.Finished : AppState.Playing);
         }
 
         void BackToIdle()

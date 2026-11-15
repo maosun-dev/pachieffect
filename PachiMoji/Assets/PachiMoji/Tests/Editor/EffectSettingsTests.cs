@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiGreen" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -228,6 +228,14 @@ namespace PachiMoji.Tests
             Assert.Greater(s.ObiGlowWidth, d.ObiGlowWidth);
             Assert.Greater(s.ObiGlowBright, d.ObiGlowBright);
             Assert.Less(new EffectSettings { ObiGlowAmount = ObiGlowAmount.Low }.ObiGlowWidth, d.ObiGlowWidth);
+        }
+
+        [Test]
+        public void グリーンバックの既定はなしで保存できる()
+        {
+            Assert.IsFalse(EffectSettings.Load(P).ObiGreen);
+            new EffectSettings { ObiGreen = true }.Save(P);
+            Assert.IsTrue(EffectSettings.Load(P).ObiGreen);
         }
     }
 }

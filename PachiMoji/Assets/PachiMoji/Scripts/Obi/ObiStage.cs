@@ -168,7 +168,12 @@ namespace PachiMoji
 
             // 写真：帯の奥に、書き出しの枠（9:16）を覆う板
             st.frameW = 2 * halfW * (PhotoZ + dist) / dist;
-            if (photo != null)
+            if (settings.ObiGreen)
+            {
+                // グリーンバック：背景は緑一色（写真・模様は出さない。動画編集で緑を抜いて重ねる）
+                st.cam.backgroundColor = GreenBack;
+            }
+            else if (photo != null)
             {
                 var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
                 Object.DestroyImmediate(q.GetComponent<Collider>());
@@ -221,6 +226,9 @@ namespace PachiMoji
             photoQuad.localPosition = new Vector3(off.x, off.y, PhotoZ);
             photoQuad.localScale = new Vector3(size.x, size.y, 1);
         }
+
+        /// <summary>グリーンバックの緑（動画編集の「クロマキー」で抜きやすい純な緑）</summary>
+        public static readonly Color GreenBack = new Color(0, 1, 0, 1);
 
         public bool HasPhoto => photoQuad != null;
         public float PhotoAspect => photoAspect;
