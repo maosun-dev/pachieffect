@@ -32,8 +32,8 @@ namespace PachiMoji
             // 激アツの帯の文字の厚み：赤〜銅（参考の帯の、奥へ深く伸びる赤い厚み）
             // 字のすき間・きわ：深い赤茶（参考の帯は字の中に黒い面が無い）
             ["obiFloor"] = new[] { (0f, "#1c0400"), (0.5f, "#4a0e00"), (0.8f, "#8a2400"), (1f, "#e07030") },
-            ["obiSide"] = new[] { (0f, "#160000"), (0.3f, "#5c0400"), (0.5f, "#a01200"), (0.68f, "#d42800"),
-                (0.84f, "#f84a08"), (0.94f, "#ff7a28"), (1f, "#ffb070") },
+            ["obiSide"] = new[] { (0f, "#140000"), (0.25f, "#5a0800"), (0.45f, "#a81c00"), (0.62f, "#e04a08"),
+                (0.78f, "#ff8a30"), (0.9f, "#ffc878"), (1f, "#fff0d0") },
         };
 
         static readonly Dictionary<string, Texture2D> cache = new Dictionary<string, Texture2D>();

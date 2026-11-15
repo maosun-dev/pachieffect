@@ -77,17 +77,16 @@ namespace PachiMoji
             float maxH = 0.001f, refCy = 0;
             // 帯の文字は極太ゴシック（参考の帯の字）。その書体に無い字だけ、設定の書体で作る
             var band = PachiText.LoadFont(BandFont);
-            // 立体の形：参考の帯の字は、つるっとした金の面と細い面取りだけ（太いフチ・溝は無い）。厚みは深く
+            // 立体の形：王道昇格と同じ金属の字（フチ・溝あり。ユーザー「金属感あるほうが好き」）。厚みを深く、外のフチは細く（字の細さを保つ）
             var style = PachiTextBuilder.DefaultStyle();
-            style.sideProfile = new[] { new Vector2(0, 22), new Vector2(0, 520) };
-            style.steps = new[]
+            style.sideProfile = new[] { new Vector2(0, 32), new Vector2(0, 620) };
+            const float rimK = 0.6f;
+            style.silhouette *= rimK;
+            for (int r = 0; r < style.rimSteps.Length; r++)
             {
-                new PachiTextBuilder.Step(-4, 0, 4, 4, PachiTextBuilder.Part.Line),    // 面のきわの細い明るい面取り
-                new PachiTextBuilder.Step(4, 4, 28, 22, PachiTextBuilder.Part.Rim),    // 太い金の斜面（字の線を太く見せる。参考の字の面取り）
-            };
-            style.silhouette = 28;
-            style.floorZ = 22;
-            style.rimSteps = new[] { new PachiTextBuilder.Step(-1, 22, 0, 22, PachiTextBuilder.Part.Rim) };   // 外のフチは付けない（形の都合で細い1段だけ）
+                var q = style.rimSteps[r];
+                style.rimSteps[r] = new PachiTextBuilder.Step(q.inner * rimK, q.zIn, q.outer * rimK, q.zOut, q.part);
+            }
             foreach (var ch in chars)
             {
                 if (templates.ContainsKey(ch)) continue;
@@ -97,7 +96,6 @@ namespace PachiMoji
                 // 厚みを赤銅にする（表の面・フチは金のまま）
                 var gm = go.GetComponent<MeshRenderer>().sharedMaterials;
                 gm[4].SetTexture("_Ramp", PachiRamps.Get("obiSide"));
-                gm[4].SetFloat("_BackFade", 0.1f);    // 奥ほど暗い赤に沈める（小さいほど奥が暗い）
                 gm[2].SetTexture("_Ramp", PachiRamps.Get("obiFloor"));   // 字のすき間・きわ：黒ではなく深い赤茶
                 gm[2].SetFloat("_Boost", 1.2f);
                 Shear(go.GetComponent<PachiText.Rig>().mesh, ObiPlan.Slant);
