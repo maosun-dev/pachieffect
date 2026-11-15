@@ -25,6 +25,7 @@ namespace PachiMoji
         }
 
         public float Duration => ObiPlan.Duration;
+        public bool Loops => true;
         public void Evaluate(float t) => stage.Evaluate(t);
         public void Idle(float t) => stage.Evaluate(Mathf.Repeat(t, ObiPlan.Duration));
         public Camera Camera => stage.cam;

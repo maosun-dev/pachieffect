@@ -33,7 +33,7 @@ namespace PachiMoji
             int h = Mathf.Max(16, Mathf.RoundToInt(play.height * screenPx.y));
             rt = new RenderTexture(w, h, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB) { name = "Stage" };
             rt.Create();
-            Effect = EffectCatalog.Get("oudou").Create();
+            Effect = EffectCatalog.Get(settings?.EffectId).Create();
             Effect.Build(lines, (float)w / h, settings);
             Effect.Camera.targetTexture = rt;
             Effect.Camera.cullingMask &= ~(1 << MainScreen.UiLayer);

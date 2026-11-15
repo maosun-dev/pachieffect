@@ -290,7 +290,8 @@ namespace PachiMoji
                 return;
             }
             string key = string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
-                         + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size;
+                         + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
+                         + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom;
             if (stage.Effect == null || key != builtKey)
             {
                 stage.Build(check.Lines, settings, ScreenPx);

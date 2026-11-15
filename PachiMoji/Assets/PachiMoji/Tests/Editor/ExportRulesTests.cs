@@ -6,6 +6,7 @@ namespace PachiMoji.Tests
     public class ExportRulesTests
     {
         [Test] public void 最後のコマまで数える() { Assert.AreEqual(451, ExportPlan.FrameCount(15f)); Assert.AreEqual(271, ExportPlan.FrameCount(9f)); }
+        [Test] public void くり返す演出は終わりの時刻のコマを入れない() { Assert.AreEqual(300, ExportPlan.FrameCount(10f, true)); Assert.AreEqual(301, ExportPlan.FrameCount(10f, false)); }
         [Test] public void 割り切れない長さは最後に終わりの時刻のコマを足す() => Assert.AreEqual(272, ExportPlan.FrameCount(9.02f));
         [Test] public void 時刻は30分の1秒ずつ() { Assert.AreEqual(0f, ExportPlan.TimeOf(0, 15f)); Assert.AreEqual(1f, ExportPlan.TimeOf(30, 15f), 1e-5f); }
         [Test] public void 最後のコマは終わりの時刻ちょうど() { Assert.AreEqual(15f, ExportPlan.TimeOf(450, 15f), 1e-5f); Assert.AreEqual(9.02f, ExportPlan.TimeOf(271, 9.02f), 1e-5f); }

@@ -528,6 +528,20 @@ namespace PachiMoji.EditorTools
             }
             else Expect(false, "印なしのコマ数");
 
+            // 選んでいる演出で書き出す：激アツの帯は 10 秒（300 コマ）、知らない演出は王道昇格
+            string dirObi = Path.Combine(outDir, "export_frames_obi");
+            var exObi = new VideoExporter(Words, new EffectSettings { EffectId = "obi" }, true, new PngVideoWriter(), dirObi);
+            Expect(exObi.Start() == ExportError.None, "帯の書き出しを始められる");
+            RunExport(exObi);
+            Debug.Log($"[PachiAppCheck] 帯の書き出し {exObi.Status} コマ {exObi.TotalFrames} 長さ {exObi.Duration:F2}");
+            Expect(exObi.Status == ExportStatus.Done && exObi.TotalFrames == 300 && Mathf.Approximately(exObi.Duration, 10f), "帯の演出で 10 秒書き出せる");
+            exObi.Dispose();
+            DeleteDir(dirObi);
+            var exUnknown = new VideoExporter(Words, new EffectSettings { EffectId = "xxx" }, true, new PngVideoWriter(), dirObi);
+            Expect(exUnknown.Start() == ExportError.None && Mathf.Approximately(exUnknown.Duration, ex.Duration), "知らない演出は王道昇格で書き出す");
+            exUnknown.Dispose();
+            DeleteDir(dirObi);
+
             // 受け取り待ち（Busy）：iPhone の動画づくりは、ときどき「まだ受け取れない」を返す。
             // 次の Step でもう一度渡したコマが、ふつうに書いたコマと同じ中身であること
             string dirBusy = Path.Combine(outDir, "export_frames_busy");

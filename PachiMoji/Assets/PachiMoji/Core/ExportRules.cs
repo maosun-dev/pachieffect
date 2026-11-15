@@ -9,7 +9,10 @@ namespace PachiMoji
         public const long BitRate = 12_000_000;   // 1秒あたりの量（ビット）。細かく動く背景でも崩れないよう多めに
 
         /// <summary>0秒から終わりの時刻ちょうどまでのコマ数（割り切れない長さでも、最後に終わりの時刻のコマを入れる）</summary>
-        public static int FrameCount(float duration) => Mathf.CeilToInt(duration * Fps - 1e-3f) + 1;
+        public static int FrameCount(float duration) => FrameCount(duration, false);
+
+        /// <summary>loops＝くり返す演出（終わりの姿＝始まりの姿）。終わりの時刻のコマは入れない（くり返し再生で同じ絵が2コマ続かないように）</summary>
+        public static int FrameCount(float duration, bool loops) => Mathf.CeilToInt(duration * Fps - 1e-3f) + (loops ? 0 : 1);
 
         /// <summary>そのコマの時刻（終わりの時刻を超えない）</summary>
         public static float TimeOf(int frame, float duration) => Mathf.Min(frame / (float)Fps, duration);

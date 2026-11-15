@@ -54,10 +54,10 @@ namespace PachiMoji
         /// <summary>空き容量を確かめ、演出を組み立て、書き始める。None 以外なら何も残さない</summary>
         public ExportError Start()
         {
-            effect = EffectCatalog.Get("oudou").Create();
+            effect = EffectCatalog.Get(settings?.EffectId).Create();
             effect.Build(lines, (float)ExportPlan.Width / ExportPlan.Height, settings);
             Duration = effect.Duration;
-            TotalFrames = ExportPlan.FrameCount(Duration);
+            TotalFrames = ExportPlan.FrameCount(Duration, effect.Loops);
 
             string dir = Path.GetDirectoryName(Path.GetFullPath(OutputPath));
             if (writer.FreeBytes(dir) < ExportPlan.NeedBytes(Duration)) return Fail(ExportError.NoSpace);
