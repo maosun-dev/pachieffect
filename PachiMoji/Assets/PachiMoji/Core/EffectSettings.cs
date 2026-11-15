@@ -30,6 +30,7 @@ namespace PachiMoji
         public string PhotoPath = "";                 // 激アツの帯の背景の写真（端末の中に写したもの。空＝なし）
         public Vector2 PhotoOffset;                   // 写真のずらし（書き出しの枠の幅を 1 とする。PhotoFit）
         public float PhotoZoom = 1;                   // 写真の倍率（1〜4）
+        public float VideoStart, VideoEnd;            // 背景が動画のとき、使う区間（秒）。書き出しはこの長さ
         public ObiDepth ObiDepth = ObiDepth.Full;     // 激アツの帯：文字の厚み
         public ObiRed ObiRed = ObiRed.None;           // 激アツの帯：厚みの奥の赤み
         public ObiGlow ObiGlow = ObiGlow.None;        // 激アツの帯：文字の後ろの光（なし・金の光・炎）
@@ -89,6 +90,8 @@ namespace PachiMoji
             s.PhotoPath = PlayerPrefs.GetString(prefix + "photo", "");
             s.PhotoOffset = new Vector2(PlayerPrefs.GetFloat(prefix + "photoX", 0), PlayerPrefs.GetFloat(prefix + "photoY", 0));
             s.PhotoZoom = PhotoFit.ClampZoom(PlayerPrefs.GetFloat(prefix + "photoZoom", 1));
+            s.VideoStart = Mathf.Max(0, PlayerPrefs.GetFloat(prefix + "videoStart", 0));
+            s.VideoEnd = Mathf.Max(0, PlayerPrefs.GetFloat(prefix + "videoEnd", 0));
             s.ObiDepth = (ObiDepth)Pick(prefix + "obiDepth", (int)d.ObiDepth, 3);
             s.ObiRed = (ObiRed)Pick(prefix + "obiRed", (int)d.ObiRed, 2);
             s.ObiGlow = (ObiGlow)Pick(prefix + "obiGlow", (int)d.ObiGlow, 2);
@@ -119,6 +122,8 @@ namespace PachiMoji
             PlayerPrefs.SetFloat(prefix + "photoX", PhotoOffset.x);
             PlayerPrefs.SetFloat(prefix + "photoY", PhotoOffset.y);
             PlayerPrefs.SetFloat(prefix + "photoZoom", PhotoZoom);
+            PlayerPrefs.SetFloat(prefix + "videoStart", VideoStart);
+            PlayerPrefs.SetFloat(prefix + "videoEnd", VideoEnd);
             PlayerPrefs.SetInt(prefix + "obiDepth", (int)ObiDepth);
             PlayerPrefs.SetInt(prefix + "obiRed", (int)ObiRed);
             PlayerPrefs.SetInt(prefix + "obiGlow", (int)ObiGlow);
