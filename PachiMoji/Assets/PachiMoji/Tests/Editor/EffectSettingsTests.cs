@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -149,6 +149,37 @@ namespace PachiMoji.Tests
             var b = a.Clone();
             b.SparksOn = false;
             Assert.IsTrue(a.SparksOn);
+        }
+    
+        [Test]
+        public void 演出と写真の既定()
+        {
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual("oudou", s.EffectId);
+            Assert.AreEqual("", s.PhotoPath);
+            Assert.AreEqual(Vector2.zero, s.PhotoOffset);
+            Assert.AreEqual(1f, s.PhotoZoom);
+        }
+
+        [Test]
+        public void 演出と写真を保存して読み戻す()
+        {
+            new EffectSettings { EffectId = "obi", PhotoPath = "a/b.jpg", PhotoOffset = new Vector2(0.1f, -0.2f), PhotoZoom = 2.5f }.Save(P);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual("obi", s.EffectId);
+            Assert.AreEqual("a/b.jpg", s.PhotoPath);
+            Assert.AreEqual(0.1f, s.PhotoOffset.x, 1e-6f);
+            Assert.AreEqual(-0.2f, s.PhotoOffset.y, 1e-6f);
+            Assert.AreEqual(2.5f, s.PhotoZoom, 1e-6f);
+        }
+
+        [Test]
+        public void 写真の倍率が範囲外なら収める()
+        {
+            PlayerPrefs.SetFloat(P + "photoZoom", 10);
+            Assert.AreEqual(PhotoFit.MaxZoom, EffectSettings.Load(P).PhotoZoom);
+            PlayerPrefs.SetFloat(P + "photoZoom", 0.2f);
+            Assert.AreEqual(1f, EffectSettings.Load(P).PhotoZoom);
         }
     }
 }

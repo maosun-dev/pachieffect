@@ -19,6 +19,10 @@ namespace PachiMoji
         public int TeaseCount = TeasePlan.MaxChars;   // チラ見せの文字数（0＝なし〜12。言葉より多ければ全部）
         public Tier TeaseText = Tier.Silver;          // チラ見せの文字色
         public Tier TeaseBack = Tier.Blue;            // チラ見せの背景
+        public string EffectId = "oudou";             // 選んでいる演出（知らない ID は EffectCatalog.Get が最初の演出にする）
+        public string PhotoPath = "";                 // 激アツの帯の背景の写真（端末の中に写したもの。空＝なし）
+        public Vector2 PhotoOffset;                   // 写真のずらし（書き出しの枠の幅を 1 とする。PhotoFit）
+        public float PhotoZoom = 1;                   // 写真の倍率（1〜4）
 
         /// <summary>Resources/Fonts/ の書体の名前</summary>
         public string FontName => Font == TextFont.Mincho ? "ZenOldMinchoBlack" : "ReggaeOne";
@@ -47,6 +51,10 @@ namespace PachiMoji
             s.TeaseCount = Pick(prefix + "teaseCount", d.TeaseCount, TeasePlan.MaxChars);
             s.TeaseText = (Tier)Pick(prefix + "teaseText", (int)d.TeaseText, (int)Tier.Rainbow);
             s.TeaseBack = (Tier)Pick(prefix + "teaseBack", (int)d.TeaseBack, (int)Tier.Rainbow);
+            s.EffectId = PlayerPrefs.GetString(prefix + "effect", d.EffectId);
+            s.PhotoPath = PlayerPrefs.GetString(prefix + "photo", "");
+            s.PhotoOffset = new Vector2(PlayerPrefs.GetFloat(prefix + "photoX", 0), PlayerPrefs.GetFloat(prefix + "photoY", 0));
+            s.PhotoZoom = PhotoFit.ClampZoom(PlayerPrefs.GetFloat(prefix + "photoZoom", 1));
             return s;
         }
 
@@ -60,6 +68,11 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "teaseCount", TeaseCount);
             PlayerPrefs.SetInt(prefix + "teaseText", (int)TeaseText);
             PlayerPrefs.SetInt(prefix + "teaseBack", (int)TeaseBack);
+            PlayerPrefs.SetString(prefix + "effect", EffectId);
+            PlayerPrefs.SetString(prefix + "photo", PhotoPath ?? "");
+            PlayerPrefs.SetFloat(prefix + "photoX", PhotoOffset.x);
+            PlayerPrefs.SetFloat(prefix + "photoY", PhotoOffset.y);
+            PlayerPrefs.SetFloat(prefix + "photoZoom", PhotoZoom);
             PlayerPrefs.Save();
         }
 
