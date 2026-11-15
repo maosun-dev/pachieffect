@@ -280,6 +280,12 @@ namespace PachiMoji
             ui.SetPushEnabled(check.CanPlay);
         }
 
+        // 舞台の組み立て直しの合図：言葉・演出に関わる設定・演出・写真のどれかが変われば変わる
+        string BuildKey() =>
+            string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
+            + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
+            + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom;
+
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()
         {
@@ -289,12 +295,17 @@ namespace PachiMoji
                 stage.SetVisible(false);   // 前の言葉を出したままにしない
                 return;
             }
-            string key = string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
-                         + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
-                         + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom;
+            string key = BuildKey();
             if (stage.Effect == null || key != builtKey)
             {
                 stage.Build(check.Lines, settings, ScreenPx);
+                // 写真が消えていた（端末の掃除・入れ直し）：黒で組んだので、設定からも外す
+                if (stage.Effect is ObiEffect obi && obi.PhotoMissing)
+                {
+                    settings.PhotoPath = "";
+                    settings.Save();
+                    key = BuildKey();
+                }
                 builtKey = key;
                 PlayerPrefs.SetString(WordsKey1, ui.Line1.text);
                 PlayerPrefs.SetString(WordsKey2, ui.Line2.text);

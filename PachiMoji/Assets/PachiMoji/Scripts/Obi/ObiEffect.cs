@@ -17,11 +17,13 @@ namespace PachiMoji
             stage = ObiStage.Build(lines, aspect, settings, photo);
         }
 
-        // 写真の読み込み（Task 5 で PhotoStore につなぐ）
+        // 写真の読み込み。設定に写真があるのに読めなければ PhotoMissing（黒で組む）
         Texture2D LoadPhoto(EffectSettings s)
         {
-            PhotoMissing = false;
-            return null;
+            if (s == null || string.IsNullOrEmpty(s.PhotoPath)) { PhotoMissing = false; return null; }
+            var tex = PhotoStore.Load(s.PhotoPath);
+            PhotoMissing = tex == null;
+            return tex;
         }
 
         public float Duration => ObiPlan.Duration;

@@ -124,6 +124,7 @@ namespace PachiMoji.EditorTools
                 go1 = CountSceneObjects(); mat1 = Count<Material>(); mesh1 = Count<Mesh>();
                 Debug.Log($"[PachiAppCheck] 帯の組み立て直しの前後 物 {go0}→{go1} 材質 {mat0}→{mat1} メッシュ {mesh0}→{mesh1}");
                 Expect(go1 == go0 && mat1 == mat0 && mesh1 == mesh0, "帯を組み立て直しても物が残らない");
+                CheckPhoto();
 
                 // チラ見せの色：2文字目のまん中（文字色 金・背景 紫／文字色 虹・背景 銀）
                 foreach (var (tx, bk) in new[] { (Tier.Gold, Tier.Purple), (Tier.Rainbow, Tier.Silver) })
@@ -530,11 +531,13 @@ namespace PachiMoji.EditorTools
 
             // 選んでいる演出で書き出す：激アツの帯は 10 秒（300 コマ）、知らない演出は王道昇格
             string dirObi = Path.Combine(outDir, "export_frames_obi");
-            var exObi = new VideoExporter(Words, new EffectSettings { EffectId = "obi" }, true, new PngVideoWriter(), dirObi);
+            // PNG にはせずコマ数だけ数える（PNG に書くのは重く、続けて書き出すと Unity が落ちることがあったため）
+            var counter = new CountingWriter();
+            var exObi = new VideoExporter(Words, new EffectSettings { EffectId = "obi" }, true, counter, dirObi);
             Expect(exObi.Start() == ExportError.None, "帯の書き出しを始められる");
             RunExport(exObi);
             Debug.Log($"[PachiAppCheck] 帯の書き出し {exObi.Status} コマ {exObi.TotalFrames} 長さ {exObi.Duration:F2}");
-            Expect(exObi.Status == ExportStatus.Done && exObi.TotalFrames == 300 && Mathf.Approximately(exObi.Duration, 10f), "帯の演出で 10 秒書き出せる");
+            Expect(exObi.Status == ExportStatus.Done && exObi.TotalFrames == 300 && counter.Count == 300 && Mathf.Approximately(exObi.Duration, 10f), "帯の演出で 10 秒書き出せる");
             exObi.Dispose();
             DeleteDir(dirObi);
             var exUnknown = new VideoExporter(Words, new EffectSettings { EffectId = "xxx" }, true, new PngVideoWriter(), dirObi);
@@ -584,6 +587,49 @@ namespace PachiMoji.EditorTools
             Expect(go1 == go0 && mat1 == mat0 && mesh1 == mesh0 && rt1 == rt0, "書き出しをくり返しても物が残らない");
         }
 
+        // 写真：大きい写真は縮めて写す、壊れた・無いファイルは読まない、消えた写真は帯の演出が気づく
+        static void CheckPhoto()
+        {
+            string tmp = Path.Combine(Path.GetTempPath(), "pachi_photo_check");
+            DeleteDir(tmp);
+            Directory.CreateDirectory(tmp);
+            var big = new Texture2D(5000, 3000, TextureFormat.RGB24, false);
+            string src = Path.Combine(tmp, "big.jpg");
+            File.WriteAllBytes(src, big.EncodeToJPG(80));
+            UnityEngine.Object.DestroyImmediate(big);
+
+            Environment.SetEnvironmentVariable("PACHI_PHOTO", src);
+            PhotoPickResult got = PhotoPickResult.Failed; string path = null;
+            PhotoPicker.Pick((r, p) => { got = r; path = p; });
+            Environment.SetEnvironmentVariable("PACHI_PHOTO", null);
+            Expect(got == PhotoPickResult.Picked && path != null && File.Exists(path), "写真を選ぶと端末の中に写る");
+            var tex = PhotoStore.Load(path);
+            Expect(tex != null && Mathf.Max(tex.width, tex.height) <= PhotoStore.MaxSide, "大きい写真は長い辺 2048 以下で読む（" + (tex != null ? tex.width + "x" + tex.height : "null") + "）");
+            Expect(tex != null && Mathf.Abs((float)tex.width / tex.height - 5000f / 3000f) < 0.01f, "縮めても縦横比は同じ");
+            if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
+
+            var fx = new ObiEffect();
+            fx.Build(new[] { "写真" }, 0.5f, new EffectSettings { EffectId = "obi", PhotoPath = path });
+            Expect(!fx.PhotoMissing, "写した写真で帯を組める");
+            fx.Dispose();
+            PhotoStore.Delete(path);
+            Expect(!File.Exists(path), "写真を消せる");
+
+            fx = new ObiEffect();
+            fx.Build(new[] { "写真" }, 0.5f, new EffectSettings { EffectId = "obi", PhotoPath = path });
+            Expect(fx.PhotoMissing, "消えた写真に気づく");
+            fx.Dispose();
+
+            string broken = Path.Combine(tmp, "broken.jpg");
+            File.WriteAllBytes(broken, new byte[] { 1, 2, 3 });
+            Expect(PhotoStore.Load(broken) == null, "壊れた写真は読まない");
+            Expect(PhotoStore.Load(Path.Combine(tmp, "none.jpg")) == null && PhotoStore.Load("") == null, "無い写真は読まない");
+
+            PhotoPicker.Pick((r, p) => got = r);
+            Expect(got == PhotoPickResult.Cancelled, "選ぶ写真が無ければやめた扱い");
+            DeleteDir(tmp);
+        }
+
         static List<int> RunExport(VideoExporter ex)
         {
             var pct = new List<int>();
@@ -621,6 +667,13 @@ namespace PachiMoji.EditorTools
             foreach (var c in px) sum += c.grayscale;
             UnityEngine.Object.DestroyImmediate(tex);
             return sum / px.Length;
+        }
+
+        // 書かずにコマ数だけ数える書き手
+        class CountingWriter : PngVideoWriter
+        {
+            public int Count;
+            public override WriteResult Append(NativeArray<byte> bgra, int frame) { Count++; return WriteResult.Ok; }
         }
 
         // 10コマ目で書けなくなる書き手
