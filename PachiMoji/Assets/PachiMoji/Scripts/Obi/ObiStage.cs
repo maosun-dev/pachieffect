@@ -77,27 +77,31 @@ namespace PachiMoji
             float maxH = 0.001f, refCy = 0;
             // 帯の文字は極太ゴシック（参考の帯の字）。その書体に無い字だけ、設定の書体で作る
             var band = PachiText.LoadFont(BandFont);
+            // 立体の形：厚みをとても深く、外のフチは細く（字の細さを保つ）
+            var style = PachiTextBuilder.DefaultStyle();
+            style.sideProfile = new[] { new Vector2(0, 32), new Vector2(0, 1250) };
+            const float rimK = 0.6f;
+            style.silhouette *= rimK;
+            for (int r = 0; r < style.rimSteps.Length; r++)
+            {
+                var q = style.rimSteps[r];
+                style.rimSteps[r] = new PachiTextBuilder.Step(q.inner * rimK, q.zIn, q.outer * rimK, q.zOut, q.part);
+            }
             foreach (var ch in chars)
             {
                 if (templates.ContainsKey(ch)) continue;
                 bool has = band.GlyphIndex(char.ConvertToUtf32(ch, 0)) != 0;
-                var go = PachiText.Create(new[] { ch }, Tier.Gold, has ? BandFont : settings.FontName);
+                var go = PachiText.Create(new[] { ch }, Tier.Gold, has ? BandFont : settings.FontName, style);
                 go.transform.SetParent(st.root.transform, false);
+                // 厚みを赤銅にする（表の面・フチは金のまま）
+                go.GetComponent<MeshRenderer>().sharedMaterials[4].SetTexture("_Ramp", PachiRamps.Get("obiSide"));
+                Shear(go.GetComponent<PachiText.Rig>().mesh, ObiPlan.Slant);
                 var b = go.GetComponent<MeshRenderer>().bounds;
                 go.SetActive(false);
                 templates[ch] = (go, new Vector3(b.center.x, b.center.y, b.min.z));
                 if (b.size.y > maxH) { maxH = b.size.y; refCy = b.center.y; }
             }
             float scale = ObiPlan.LetterH / maxH;
-            // 塗りを「焼けた金・赤い縁・赤い厚み」に替える（王道昇格の黒い縁どりの金とは別の塗り）
-            st.hot = HotMaterials(refCy - maxH / 2, refCy + maxH / 2);
-            foreach (var tpl in templates.Values)
-            {
-                var mr = tpl.go.GetComponent<MeshRenderer>();
-                foreach (var old in mr.sharedMaterials) Kill(old);
-                mr.sharedMaterials = st.hot;
-                tpl.go.GetComponent<PachiText.Rig>().mats = st.hot;
-            }
 
             // 帯：画面に見える範囲（＋少し外）だけに切る（短いほど目安の速さで 10 秒につながる）
             var lanes = new[]
@@ -112,7 +116,12 @@ namespace PachiMoji
             starMat.SetFloat("_Angle", 0.2f);
             foreach (var lane in lanes)
             {
-                st.fires.Add(ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW, lane.loop, lane.speed, lane.dir, st.root.transform));
+                if (Band != BandLook.None)
+                {
+                    var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW, lane.loop, lane.speed, lane.dir, st.root.transform);
+                    fire.SetFloat("_Gold", Band == BandLook.Gold ? 1 : 0);
+                    st.fires.Add(fire);
+                }
                 int slots = Mathf.RoundToInt(lane.loop / ObiPlan.Spacing);
                 for (int k = 0; k < slots; k++)
                 {
@@ -128,6 +137,7 @@ namespace PachiMoji
                     // 角のキラッは4文字に1つだけ
                     var rig = copy.GetComponent<PachiText.Rig>();
                     for (int g = 0; g < rig.glints.Count; g++) rig.glints[g].gameObject.SetActive(k % 4 == 0 && g == 0);
+                    copy.transform.localRotation = lane.dir < 0 ? TopTurn : BottomTurn;
                     st.letters.Add((holder.transform, lane, k * ObiPlan.Spacing, 0, false));
                 }
 
@@ -141,10 +151,10 @@ namespace PachiMoji
                     Object.DestroyImmediate(q.GetComponent<Collider>());
                     q.transform.SetParent(holder.transform, false);
                     q.transform.localPosition = new Vector3(0, 0, -0.3f);   // 文字より手前
-                    q.transform.localScale = Vector3.one * (0.55f + 0.75f * (float)rnd.NextDouble());
+                    q.transform.localScale = Vector3.one * (0.35f + 0.5f * (float)rnd.NextDouble());
                     var r = q.GetComponent<MeshRenderer>();
                     r.sharedMaterial = starMat;
-                    st.stars.Add((r, (float)rnd.NextDouble(), 2 + rnd.Next(4), 3.5f + 4f * (float)rnd.NextDouble()));
+                    st.stars.Add((r, (float)rnd.NextDouble(), 2 + rnd.Next(4), 2.2f + 2.6f * (float)rnd.NextDouble()));
                     float lift = ((float)rnd.NextDouble() * 2 - 1) * ObiPlan.BandW * 0.8f;
                     st.letters.Add((holder.transform, lane, (j + (float)rnd.NextDouble()) * lane.loop / starCount, lift, false));
                 }
@@ -233,36 +243,26 @@ namespace PachiMoji
             return lane;
         }
 
-        const string BandFont = "MPLUS1pBlack";
+        // 帯の文字の書体：明朝（細くて長い字。ユーザーの指定）。その書体に無い字だけ設定の書体
+        const string BandFont = "ZenOldMinchoBlack";
+        /// <summary>文字の後ろの光：なし（参考の帯。文字だけが列になって流れる）・金の光・炎</summary>
+        public enum BandLook { None, Gold, Fire }
+        public static BandLook Band = BandLook.None;
 
-        // 文字の材質（サブメッシュ順：表の面・細い線・字のすき間の床・外フチ・側面）。y0〜y1 は字の高さの範囲
-        static Material[] HotMaterials(float y0, float y1)
+        // 文字の向き：上の列は下から見上げ（厚みが下・奥へ）、下の列は上から見下ろす（厚みが上・奥へ）。どちらも少し横を向けて厚みを見せる
+        static readonly Quaternion TopTurn = Quaternion.Euler(22, 24, 0);
+        static readonly Quaternion BottomTurn = Quaternion.Euler(-18, 24, 0);
+
+        // 字を斜めにする：上へ行くほど x をずらす（立体の点を直接動かす。1文字の型ごとに1回だけ）
+        static void Shear(Mesh mesh, float k)
         {
-            Material M(string top, string bot, float band, float lit, float glow, float sheen)
-            {
-                var m = new Material(Shader.Find("PachiMoji/Hot"));
-                ColorUtility.TryParseHtmlString(top, out var ct);
-                ColorUtility.TryParseHtmlString(bot, out var cb);
-                m.SetColor("_Top", ct.linear);
-                m.SetColor("_Bot", cb.linear);
-                m.SetVector("_Band", new Vector4(0.56f, 0.085f, band, 0));
-                m.SetVector("_Y", new Vector4(y0, y1, 0, 0));
-                m.SetFloat("_Lit", lit);
-                m.SetFloat("_Glow", glow);
-                m.SetFloat("_Sheen", sheen);
-                return m;
-            }
-            return new[]
-            {
-                M("#FFE02A", "#FFAE00", 0.95f, 0, 1.2f, 0.9f),     // 表の面：黄〜濃い金に、白く焼けた帯
-                M("#FFF7B8", "#FFE060", 0.6f, 0, 1.7f, 0.9f),      // 細い線：白っぽい金
-                M("#C01000", "#7E0000", 0f, 0, 1.0f, 0.15f),      // 字のすき間の床：濃い赤（字の線を立たせる）
-                M("#FF5A00", "#C80E00", 0.2f, 0.35f, 1.15f, 0.4f), // 外フチ：赤〜橙
-                M("#D01200", "#5E0000", 0f, 0.8f, 1.0f, 0f),       // 側面（厚み）：濃い赤
-            };
+            var v = mesh.vertices;
+            float cy = mesh.bounds.center.y;
+            for (int i = 0; i < v.Length; i++) v[i].x += (v[i].y - cy) * k;
+            mesh.vertices = v;
+            mesh.RecalculateBounds();
         }
 
-        Material[] hot;
         Material back;
         // キラキラ（描くもの・またたきのずれ・10 秒でまたたく回数・明るさ）
         readonly List<(Renderer r, float phase, int times, float bright)> stars = new List<(Renderer, float, int, float)>();
@@ -273,7 +273,6 @@ namespace PachiMoji
         public void Evaluate(float t)
         {
             foreach (var f in fires) f.SetFloat("_T", t);
-            if (hot != null) foreach (var m in hot) m.SetFloat("_T", t);
             if (back != null) back.SetFloat("_T", t);
             block ??= new MaterialPropertyBlock();
             foreach (var sp in stars)
@@ -319,7 +318,7 @@ namespace PachiMoji
                 foreach (var c in profile.components) Kill(c);
                 Kill(profile);
             }
-            root = null; volumeGo = null; profile = null; cam = null; photoQuad = null; hot = null; back = null;
+            root = null; volumeGo = null; profile = null; cam = null; photoQuad = null; back = null;
             letters.Clear(); fires.Clear(); stars.Clear();
         }
 

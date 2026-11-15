@@ -48,7 +48,7 @@ Shader "PachiMoji/ObiBack"
                 // 帯の通る左上と右下ほど、熱が少し見える
                 float d = abs((i.uv.y - 0.5) + (i.uv.x - 0.5) * 0.35);
                 float near = smoothstep(0.05, 0.5, d);
-                float3 col = float3(0.07, 0.004, 0.0) * g * (0.2 + near) + float3(0.3, 0.06, 0.0) * g * g * near * 0.3;
+                float3 col = float3(0.035, 0.002, 0.0) * g * (0.2 + near) + float3(0.16, 0.03, 0.0) * g * g * near * 0.3;
                 return half4(col, 1);
             }
             ENDHLSL

@@ -33,10 +33,11 @@ namespace PachiMoji
         public const float Fov = 32f;                 // 基準の画面の縦の画角
         public const float BaseAspect = 9f / 19.5f;   // 基準の画面（横÷縦）
         public const float LetterH = 1.6f;            // 文字の高さ（炎の帯の高さいっぱい）
-        public const float Squeeze = 0.62f;           // 文字の横の縮め（縦長に細く。参考の帯の文字）
+        public const float Squeeze = 0.6f;            // 文字の横の縮め（縦長に細く。参考の帯の文字）
+        public const float Slant = 0.2f;              // 文字の傾き（上へ行くほど進む向きへずらす。斜めの字）
         public const float BandW = 1.35f;
         public const float BaseSpeed = 1.6f;          // 速さの目安（1 秒あたり）
-        public const float Spacing = LetterH * 0.7f;  // 文字の間隔（縦長に細くした文字が少しすき間をあけて並ぶ）
+        public const float Spacing = LetterH * 0.63f; // 文字の間隔（縦長に細くした文字が詰まって並ぶ）
 
         // 帯の位置（ユーザーと決めた形。上下は別の輪から取る。つなぎ目は画面の外）
         public static readonly ObiRing Top = new ObiRing(6.2f, 32, -32, new Vector2(0, 1.25f));

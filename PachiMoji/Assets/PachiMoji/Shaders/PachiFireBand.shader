@@ -12,6 +12,7 @@ Shader "PachiMoji/FireBand"
         _Cell ("Noise Cell", Float) = 0.55
         _Intensity ("Intensity", Float) = 1.35
         _HalfW ("Band Half Width (world)", Float) = 0.675
+        _Gold ("Gold Light (0 fire / 1 gold)", Float) = 0
     }
     SubShader
     {
@@ -26,7 +27,7 @@ Shader "PachiMoji/FireBand"
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float _T, _Loop, _Speed, _Dir, _Cell, _Intensity, _HalfW;
+                float _T, _Loop, _Speed, _Dir, _Cell, _Intensity, _HalfW, _Gold;
             CBUFFER_END
             struct A { float4 pos : POSITION; float2 uv : TEXCOORD0; };
             struct V { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
@@ -77,6 +78,22 @@ Shader "PachiMoji/FireBand"
                 float a = smoothstep(0.0, 0.2, heat);
                 float alpha = a * 0.84;
                 float3 outc = col * alpha * _Intensity + white * hot * 0.9;
+                if (_Gold > 0.5)
+                {
+                    // 金の光の帯：炎の舌は出さず、帯の幅にやわらかく収める。濃い金〜淡い金、筋は白金。透けを多めに
+                    float soft = smoothstep(1.25, 0.55, abs(y));                 // 帯のふちでやわらかく消える
+                    float shimmer = 0.55 + 0.45 * streak + 0.25 * fine;
+                    float3 deep = float3(0.85, 0.42, 0.02), gold = float3(1.0, 0.74, 0.16), pale = float3(1.0, 0.95, 0.7);
+                    float3 g = lerp(deep, gold, saturate(shimmer * 1.1));
+                    float line = smoothstep(0.66, 0.84, streak);
+                    g = lerp(g, pale, line);
+                    alpha = soft * (0.34 + 0.3 * shimmer);
+                    outc = g * alpha * 1.15 + pale * line * soft * 0.7;
+                    // 帯のふちに細い金の線（上下）
+                    float edge = exp(-pow((abs(y) - 1.02) / 0.035, 2));
+                    outc += float3(1.0, 0.86, 0.4) * edge * 1.4;
+                    alpha = saturate(alpha + edge * 0.5);
+                }
 
                 // 火の粉：帯のふちから外へ流れ飛ぶ小さな光（帯に沿って区切り、区切りごとに上と下へ1つずつ）
                 float nE = max(1, round(_Loop / 0.5));

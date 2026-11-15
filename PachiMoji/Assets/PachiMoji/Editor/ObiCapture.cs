@@ -26,8 +26,12 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_9x19.png"), 1080, 2340, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_9x16.png"), 1080, 1920, 2, 0, settings, false);
                 Shoot(Path.Combine(outDir, "obi_photo_9x16.png"), 1080, 1920, 2, 0, settings, true);
-                // 書体の見比べ（明朝）
-                Shoot(Path.Combine(outDir, "obi_mincho_9x19.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", Font = TextFont.Mincho }, false);
+                // 文字の後ろの光の見比べ（ふつうは「なし」）
+                ObiStage.Band = ObiStage.BandLook.Fire;
+                Shoot(Path.Combine(outDir, "obi_cmp_fire.png"), 1080, 1920, 2, 0, settings, true);
+                ObiStage.Band = ObiStage.BandLook.Gold;
+                Shoot(Path.Combine(outDir, "obi_cmp_gold.png"), 1080, 1920, 2, 0, settings, true);
+                ObiStage.Band = ObiStage.BandLook.None;
                 foreach (float t in new[] { 0f, 2.5f, 5f, 7.5f, 10f })
                     Shoot(Path.Combine(outDir, $"obi_t{t:0.0}.png"), 540, 1170, 1, t, settings, false);
             }
