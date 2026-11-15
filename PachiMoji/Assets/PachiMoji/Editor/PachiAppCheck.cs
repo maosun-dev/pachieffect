@@ -234,7 +234,8 @@ namespace PachiMoji.EditorTools
                     { SparksOn = false, Light = LightColor.Rainbow, Size = LightSize.Large, Font = TextFont.Mincho });
                 // いちばん下まで動かした姿（買い物は別の画面へ移したので、チラ見せの背景で終わる）
                 ShotSettings(720, 1560, Path.Combine(outDir, "settings_bottom.png"), new EffectSettings(), bottom: true);
-                ShotSettings(720, 1560, Path.Combine(outDir, "settings_obi.png"), new EffectSettings { ObiDepth = ObiDepth.Low, ObiRed = ObiRed.Half }, bottom: true);
+                ShotSettings(720, 1560, Path.Combine(outDir, "settings_obi.png"), new EffectSettings { EffectId = "obi", ObiDepth = ObiDepth.Low, ObiRed = ObiRed.Half }, sc =>
+                    Expect(!sc.Scrollable, "帯の設定は3項目だけ（王道昇格の項目は出ない）"));
                 // 昇格の色・チラ見せ（iPhone SE の 9:16 で、まん中あたりまで動かした姿）
                 var chainSettings = new EffectSettings { Chain = new[] { Tier.Green, Tier.Red, Tier.Rainbow }, TeaseCount = 3, TeaseText = Tier.Gold, TeaseBack = Tier.Purple };
                 ShotSettings(720, 1280, Path.Combine(outDir, "settings_chain.png"), chainSettings, sc =>

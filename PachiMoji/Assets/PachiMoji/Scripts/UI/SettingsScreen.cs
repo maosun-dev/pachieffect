@@ -65,8 +65,11 @@ namespace PachiMoji
             m.scroll.movementType = ScrollRect.MovementType.Elastic;
             m.scroll.scrollSensitivity = 20;
 
+            // 演出ごとに項目を分ける（王道昇格と激アツの帯は別の演出。選んでいる演出の項目だけを出す）
+            m.oudouBox = Box(content, "Oudou");
+            m.obiBox = Box(content, "Obi");
             float y = -28;
-            var parent = content;
+            var parent = m.oudouBox;
             m.Choice(parent, ref y, "火花", new[] { "あり", "なし" }, null, settings.SparksOn ? 0 : 1, 150,
                 i => settings.SparksOn = i == 0);
             m.Choice(parent, ref y, "プチュンの光の色", new[] { "青白", "金", "赤", "虹" },
@@ -82,23 +85,45 @@ namespace PachiMoji
                 i => settings.TeaseText = (Tier)i, TierTextColors());
             m.Choice(parent, ref y, "チラ見せの背景", TierNames7(), null, (int)settings.TeaseBack, 44,
                 i => settings.TeaseBack = (Tier)i, TierTextColors());
-            // 激アツの帯だけに効く項目（見出しで分ける）
-            y -= 14;
-            var obiHead = MainScreen.Rect(parent, "ObiHead");
-            MainScreen.Place(obiHead, new Vector2(0.5f, 1), new Vector2(0, y), new Vector2(340, 30));
-            MainScreen.Label(obiHead, "激アツの帯", UiTheme.Display, 20, UiTheme.Gold).alignment = TextAlignmentOptions.Left;
-            y -= 42;
+            m.oudouH = -y + 24;
+            y = -28;
+            parent = m.obiBox;
             m.Choice(parent, ref y, "文字の厚み", new[] { "うすい", "薄め", "ふつう", "厚い" }, null, (int)settings.ObiDepth, 80,
                 i => settings.ObiDepth = (ObiDepth)i);
             m.Choice(parent, ref y, "厚みの奥の赤み", new[] { "なし", "少し", "強い" }, null, (int)settings.ObiRed, 104,
                 i => settings.ObiRed = (ObiRed)i);
             m.Choice(parent, ref y, "文字の後ろの光", new[] { "なし", "金の光", "炎" }, null, (int)settings.ObiGlow, 104,
                 i => settings.ObiGlow = (ObiGlow)i);
-            content.sizeDelta = new Vector2(0, -y + 24);
+            m.obiH = -y + 24;
+            m.SetEffect(settings.EffectId);
 
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
             m.Show(false);
             return m;
+        }
+
+        RectTransform oudouBox, obiBox;
+        float oudouH, obiH;
+
+        // 項目をまとめる入れ物（中身の上の端にそろえる）
+        static RectTransform Box(RectTransform content, string name)
+        {
+            var b = MainScreen.Rect(content, name);
+            b.anchorMin = new Vector2(0, 1); b.anchorMax = new Vector2(1, 1);
+            b.pivot = new Vector2(0.5f, 1);
+            b.anchoredPosition = Vector2.zero;
+            b.sizeDelta = Vector2.zero;
+            return b;
+        }
+
+        /// <summary>選んでいる演出の項目だけを出す（開くたびに呼ぶ）</summary>
+        public void SetEffect(string effectId)
+        {
+            bool obi = EffectCatalog.Get(effectId).Id == "obi";
+            obiBox.gameObject.SetActive(obi);
+            oudouBox.gameObject.SetActive(!obi);
+            content.sizeDelta = new Vector2(0, obi ? obiH : oudouH);
+            content.anchoredPosition = Vector2.zero;
         }
 
         /// <summary>バナー広告を出すあいだは、縦に動かす範囲の下をバナーのぶん空ける（最後の項目に重ならないように）</summary>

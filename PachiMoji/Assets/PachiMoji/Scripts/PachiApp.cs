@@ -463,6 +463,7 @@ namespace PachiMoji
         void OpenSettings()
         {
             if (!OpenCover(settingsUi, AppState.Settings)) return;
+            settingsUi.SetEffect(settings.EffectId);
             settingsUi.SetWordLength(string.Concat(ui.Line1.text, ui.Line2.text).Replace(" ", "").Replace("　", "").Length);
         }
 
