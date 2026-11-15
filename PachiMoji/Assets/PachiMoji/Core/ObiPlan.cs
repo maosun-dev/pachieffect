@@ -32,7 +32,7 @@ namespace PachiMoji
         public const float ViewH = 10f;               // 基準の画面で、z=0 の面に見える高さ
         public const float Fov = 32f;                 // 基準の画面の縦の画角
         public const float BaseAspect = 9f / 19.5f;   // 基準の画面（横÷縦）
-        public const float LetterH = 0.95f;
+        public const float LetterH = 1.12f;           // 帯の幅いっぱい（縁の内側まで）
         public const float BandW = 1.35f;
         public const float BaseSpeed = 1.6f;          // 速さの目安（1 秒あたり）
         public const float Spacing = LetterH * 1.08f; // 文字の間隔

@@ -37,7 +37,8 @@ namespace PachiMoji
             }
         }
 
-        readonly List<(Transform t, Lane lane, float s0)> letters = new List<(Transform, Lane, float)>();
+        // 帯の上を流れるもの（文字・区切りの菱形・縁の飾り）。lift は帯の幅の向きのずらし、flip は外向きを下にするか
+        readonly List<(Transform t, Lane lane, float s0, float lift, bool flip)> letters = new List<(Transform, Lane, float, float, bool)>();
         Vector3 camPos;
 
         public static ObiStage Build(string[] lines, float aspect, EffectSettings settings, Texture2D photo)
@@ -93,6 +94,12 @@ namespace PachiMoji
                 st.MakeLane(ObiPlan.ArcPoints(ObiPlan.BottomFor(aspect), false, 600), +1, halfW, halfH, dist, chars.Count),
             };
             int unit = chars.Count + 1;
+            // 飾りの型と材質（どの飾りも同じものを使い回す）
+            var faceMat = ObiOrnament.Metal("goldRim", 3.2f);
+            var sideMat = ObiOrnament.Metal("goldSide", 1.5f, true);
+            var flameBig = ObiOrnament.Flame(0.30f, 0.30f, 0.06f);
+            var flameSmall = ObiOrnament.Flame(0.20f, 0.17f, 0.05f);
+            var diamond = ObiOrnament.Diamond(0.52f, 0.62f, 0.10f);
             foreach (var lane in lanes)
             {
                 ObiBand.Build(lane.pts, st.camPos, ObiPlan.BandW, st.root.transform);
@@ -100,7 +107,13 @@ namespace PachiMoji
                 for (int k = 0; k < slots; k++)
                 {
                     int ci = k % unit;
-                    if (ci == chars.Count) continue;   // 言葉と言葉のあいだの区切り
+                    if (ci == chars.Count)
+                    {
+                        // 言葉と言葉のあいだの区切り：金の菱形
+                        var dia = st.Ornament("Diamond", diamond, faceMat, sideMat);
+                        st.letters.Add((dia.transform, lane, k * ObiPlan.Spacing, 0, false));
+                        continue;
+                    }
                     var tp = templates[chars[ci]];
                     var holder = new GameObject("Letter");
                     holder.transform.SetParent(st.root.transform, false);
@@ -111,8 +124,19 @@ namespace PachiMoji
                     // 角のキラッは4文字に1つだけ
                     var rig = copy.GetComponent<PachiText.Rig>();
                     for (int g = 0; g < rig.glints.Count; g++) rig.glints[g].gameObject.SetActive(k % 4 == 0 && g == 0);
-                    st.letters.Add((holder.transform, lane, k * ObiPlan.Spacing));
+                    st.letters.Add((holder.transform, lane, k * ObiPlan.Spacing, 0, false));
                 }
+
+                // 縁からはみ出す炎の飾り（上の縁・下の縁。大小をかわりばんこに）。文字といっしょに流れる
+                int teeth = Mathf.Max(4, Mathf.RoundToInt(lane.loop / FlameStep));
+                float step = lane.loop / teeth;
+                float edge = ObiPlan.BandW * 0.5f - 0.03f;
+                foreach (bool lower in new[] { false, true })
+                    for (int j = 0; j < teeth; j++)
+                    {
+                        var f = st.Ornament("Flame", j % 2 == 0 ? flameBig : flameSmall, faceMat, sideMat);
+                        st.letters.Add((f.transform, lane, j * step + (lower ? step / 2 : 0), lower ? -edge : edge, lower));
+                    }
             }
 
             // 写真：帯の奥に、書き出しの枠（9:16）を覆う板
@@ -184,6 +208,17 @@ namespace PachiMoji
             return lane;
         }
 
+        const float FlameStep = 0.42f;   // 縁の飾りの間隔の目安
+
+        GameObject Ornament(string name, Mesh mesh, Material face, Material side)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(root.transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterials = new[] { face, side };
+            return go;
+        }
+
         public void Evaluate(float t)
         {
             foreach (var L in letters)
@@ -194,8 +229,8 @@ namespace PachiMoji
                 if (!on) continue;
                 L.lane.At(s, out var p, out var tan);
                 ObiBand.Frame(p, tan, camPos, out var fwd, out var up);
-                L.t.localPosition = p;
-                L.t.localRotation = Quaternion.LookRotation(fwd, up);
+                L.t.localPosition = p + up * L.lift;
+                L.t.localRotation = Quaternion.LookRotation(fwd, L.flip ? -up : up);
             }
         }
 
