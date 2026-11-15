@@ -10,7 +10,7 @@ namespace PachiMoji
     public static class ObiBand
     {
         /// <summary>炎の幅（帯の幅に対する倍率。炎の舌が文字の上下へはみ出す）</summary>
-        public const float FireWidth = 2.1f;
+        public const float FireWidth = 3.3f;   // 炎は 2.1 倍あたりまで、その外は火の粉が飛ぶ場所
 
         /// <summary>帯の面の向き：fwd は文字の奥向き、up は帯の幅の向き</summary>
         public static void Frame(Vector3 p, Vector3 tan, Vector3 camPos, out Vector3 fwd, out Vector3 up)
@@ -28,7 +28,7 @@ namespace PachiMoji
             mat.SetFloat("_Loop", loop);
             mat.SetFloat("_Speed", speed);
             mat.SetFloat("_Dir", dir);
-            mat.SetFloat("_Len", len[len.Length - 1]);
+            mat.SetFloat("_HalfW", bandW * 0.5f);
             float hw = bandW * 0.5f * FireWidth;
             const float back = 0.15f;   // 文字の表の面より少し奥（文字が炎の手前に立つ）
 
@@ -42,8 +42,8 @@ namespace PachiMoji
                 Frame(arc[i], tan, camPos, out var fwd, out var up);
                 verts.Add(arc[i] - up * hw + fwd * back);
                 verts.Add(arc[i] + up * hw + fwd * back);
-                uvs.Add(new Vector2(len[i], -1));
-                uvs.Add(new Vector2(len[i], 1));
+                uvs.Add(new Vector2(len[i], -FireWidth));
+                uvs.Add(new Vector2(len[i], FireWidth));
                 if (i > 0)
                 {
                     int q = (i - 1) * 2;
