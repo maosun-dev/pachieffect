@@ -18,6 +18,8 @@ Shader "PachiMoji/Metal"
         _Diffuse ("Facet Diffuse", Float) = 0.2
         _Brightness ("Brightness", Float) = 1
         _BackFade ("Back Fade", Float) = 0.3
+        _DeepTint ("Deep Tint", Color) = (1, 1, 1, 1)
+        _DeepAmount ("Deep Tint Amount", Float) = 0
         _RampB ("Ramp B", 2D) = "white" {}
         _RainbowB ("Rainbow B (0/1)", Float) = 0
         _WipeX ("Wipe X (object)", Float) = -100000
@@ -43,7 +45,8 @@ Shader "PachiMoji/Metal"
             TEXTURE2D(_RampB); SAMPLER(sampler_RampB);
             CBUFFER_START(UnityPerMaterial)
                 float4 _Ramp_ST;
-                float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness, _BackFade;
+                float _Rainbow, _HueScale, _Boost, _Horizon, _BandWidth, _Sweep, _Diffuse, _Brightness, _BackFade, _DeepAmount;
+                float4 _DeepTint;
                 float4 _RampB_ST;
                 float _RainbowB, _WipeX, _WipeGlow, _White, _HueShift, _Gray;
             CBUFFER_END
@@ -125,6 +128,8 @@ Shader "PachiMoji/Metal"
                 c *= _Brightness;
                 // 側面は奥へ行くほど暗く沈める（塊の重さが出る）
                 c *= lerp(1, _BackFade, i.uv.y);
+                // 奥へ行くほど色を寄せる（激アツの帯の厚み：手前は金属の照り、奥は赤）。_DeepAmount=0 なら何もしない
+                c = lerp(c, dot(c, float3(0.5, 0.4, 0.1)) * _DeepTint.rgb * 1.6, saturate(i.uv.y * 1.25) * _DeepAmount);
                 // 一番明るいところだけ 1 を超えさせる（ブルームで光る）
                 c *= 1 + _Boost * pow(L, 12);
                 return half4(c, 1);

@@ -37,7 +37,7 @@ namespace PachiMoji
         public const float Slant = 0.2f;              // 文字の傾き（上へ行くほど進む向きへずらす。斜めの字）
         public const float BandW = 1.35f;
         public const float BaseSpeed = 1.6f;          // 速さの目安（1 秒あたり）
-        public const float Spacing = LetterH * 0.63f; // 文字の間隔（縦長に細くした文字が詰まって並ぶ）
+        public const float Spacing = LetterH * 0.53f; // 文字の間隔（縦長に細くした文字が詰まって、少し重なって並ぶ）
 
         // 帯の位置（ユーザーと決めた形。上下は別の輪から取る。つなぎ目は画面の外）
         public static readonly ObiRing Top = new ObiRing(6.2f, 32, -32, new Vector2(0, 1.25f));
