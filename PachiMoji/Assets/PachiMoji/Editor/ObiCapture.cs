@@ -33,6 +33,9 @@ namespace PachiMoji.EditorTools
                 Shoot(Path.Combine(outDir, "obi_red_strong.png"), 1080, 2340, 2, 0, new EffectSettings { EffectId = "obi", ObiRed = ObiRed.Strong }, false);
                 Shoot(Path.Combine(outDir, "obi_glow_gold.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = ObiGlow.Gold }, true);
                 Shoot(Path.Combine(outDir, "obi_glow_fire.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = ObiGlow.Fire }, true);
+                foreach (var g in new[] { ObiGlow.Gold, ObiGlow.Fire })
+                    foreach (var k in new[] { ObiGlowAmount.Low, ObiGlowAmount.High })
+                        Shoot(Path.Combine(outDir, $"obi_glow_{g}_{k}.png"), 1080, 1920, 2, 0, new EffectSettings { EffectId = "obi", ObiGlow = g, ObiGlowAmount = k }, true);
                 foreach (float t in new[] { 0f, 2.5f, 5f, 7.5f, 10f })
                     Shoot(Path.Combine(outDir, $"obi_t{t:0.0}.png"), 540, 1170, 1, t, settings, false);
             }

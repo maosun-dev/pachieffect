@@ -9,6 +9,7 @@ namespace PachiMoji
     public enum ObiDepth { Thin, Low, Mid, Full }   // 厚い（Full）が最大。そこから薄くできる
     public enum ObiRed { None, Half, Strong }
     public enum ObiGlow { None, Gold, Fire }
+    public enum ObiGlowAmount { Low, Mid, High }
     /// <summary>演出の好み。端末（PlayerPrefs）に残し、再生にも書き出しにも同じように効く</summary>
     public class EffectSettings
     {
@@ -30,6 +31,12 @@ namespace PachiMoji
         public ObiDepth ObiDepth = ObiDepth.Full;     // 激アツの帯：文字の厚み
         public ObiRed ObiRed = ObiRed.None;           // 激アツの帯：厚みの奥の赤み
         public ObiGlow ObiGlow = ObiGlow.None;        // 激アツの帯：文字の後ろの光（なし・金の光・炎）
+        public ObiGlowAmount ObiGlowAmount = ObiGlowAmount.Mid;   // 激アツの帯：光の量（広さと明るさ）
+
+        /// <summary>光の帯の幅の倍率（少なめは字の後ろに隠れるくらい、多めは字の上下へはみ出す）</summary>
+        public float ObiGlowWidth => ObiGlowAmount switch { ObiGlowAmount.Low => 1f, ObiGlowAmount.High => 1.9f, _ => 1.45f };
+        /// <summary>光の明るさの倍率</summary>
+        public float ObiGlowBright => ObiGlowAmount switch { ObiGlowAmount.Low => 0.8f, ObiGlowAmount.High => 1.25f, _ => 1f };
 
         /// <summary>帯の文字の厚み（字の高さ 1000 に対して）</summary>
         public float ObiDepthValue => ObiDepth switch { ObiDepth.Thin => 150f, ObiDepth.Low => 300f, ObiDepth.Mid => 460f, _ => 620f };
@@ -70,6 +77,7 @@ namespace PachiMoji
             s.ObiDepth = (ObiDepth)Pick(prefix + "obiDepth", (int)d.ObiDepth, 3);
             s.ObiRed = (ObiRed)Pick(prefix + "obiRed", (int)d.ObiRed, 2);
             s.ObiGlow = (ObiGlow)Pick(prefix + "obiGlow", (int)d.ObiGlow, 2);
+            s.ObiGlowAmount = (ObiGlowAmount)Pick(prefix + "obiGlowAmount", (int)d.ObiGlowAmount, 2);
             return s;
         }
 
@@ -91,6 +99,7 @@ namespace PachiMoji
             PlayerPrefs.SetInt(prefix + "obiDepth", (int)ObiDepth);
             PlayerPrefs.SetInt(prefix + "obiRed", (int)ObiRed);
             PlayerPrefs.SetInt(prefix + "obiGlow", (int)ObiGlow);
+            PlayerPrefs.SetInt(prefix + "obiGlowAmount", (int)ObiGlowAmount);
             PlayerPrefs.Save();
         }
 

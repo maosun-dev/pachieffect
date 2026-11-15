@@ -300,7 +300,7 @@ namespace PachiMoji
             string.Join("\n", check.Lines) + "|" + settings.FontName + Chain.ToMask(settings.Chain)
             + "/" + settings.TeaseCount + settings.TeaseText + settings.TeaseBack + settings.SparksOn + settings.Light + settings.Size
             + "/" + settings.EffectId + "|" + settings.PhotoPath + "|" + settings.PhotoOffset + settings.PhotoZoom
-            + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow;
+            + "/" + settings.ObiDepth + settings.ObiRed + settings.ObiGlow + settings.ObiGlowAmount;
 
         /// <summary>入力を確定したとき：言葉か設定が変わっていれば舞台を組み立て直す</summary>
         void Rebuild()

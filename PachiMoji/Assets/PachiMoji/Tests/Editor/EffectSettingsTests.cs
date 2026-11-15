@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -215,6 +215,19 @@ namespace PachiMoji.Tests
             Assert.AreEqual(ObiDepth.Full, s.ObiDepth);
             Assert.AreEqual(ObiRed.None, s.ObiRed);
             Assert.AreEqual(ObiGlow.None, s.ObiGlow);
+        }
+
+        [Test]
+        public void 光の量の既定はふつうで保存できる()
+        {
+            var d = EffectSettings.Load(P);
+            Assert.AreEqual(ObiGlowAmount.Mid, d.ObiGlowAmount);
+            new EffectSettings { ObiGlowAmount = ObiGlowAmount.High }.Save(P);
+            var s = EffectSettings.Load(P);
+            Assert.AreEqual(ObiGlowAmount.High, s.ObiGlowAmount);
+            Assert.Greater(s.ObiGlowWidth, d.ObiGlowWidth);
+            Assert.Greater(s.ObiGlowBright, d.ObiGlowBright);
+            Assert.Less(new EffectSettings { ObiGlowAmount = ObiGlowAmount.Low }.ObiGlowWidth, d.ObiGlowWidth);
         }
     }
 }

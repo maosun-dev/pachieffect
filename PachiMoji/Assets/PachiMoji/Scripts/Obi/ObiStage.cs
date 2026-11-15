@@ -123,7 +123,8 @@ namespace PachiMoji
             {
                 if (settings.ObiGlow != ObiGlow.None)
                 {
-                    var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW, lane.loop, lane.speed, lane.dir, st.root.transform);
+                    var fire = ObiBand.Build(lane.pts, lane.len, st.camPos, ObiPlan.BandW * settings.ObiGlowWidth, lane.loop, lane.speed, lane.dir, st.root.transform);
+                    fire.SetFloat("_Intensity", fire.GetFloat("_Intensity") * settings.ObiGlowBright);
                     fire.SetFloat("_Gold", settings.ObiGlow == ObiGlow.Gold ? 1 : 0);
                     st.fires.Add(fire);
                 }

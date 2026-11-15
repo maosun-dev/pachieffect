@@ -94,6 +94,8 @@ namespace PachiMoji
                 i => settings.ObiRed = (ObiRed)i);
             m.Choice(parent, ref y, "文字の後ろの光", new[] { "なし", "金の光", "炎" }, null, (int)settings.ObiGlow, 104,
                 i => settings.ObiGlow = (ObiGlow)i);
+            m.Choice(parent, ref y, "光の量", new[] { "少なめ", "ふつう", "多め" }, null, (int)settings.ObiGlowAmount, 104,
+                i => settings.ObiGlowAmount = (ObiGlowAmount)i);
             m.obiH = -y + 24;
             m.SetEffect(settings.EffectId);
 
