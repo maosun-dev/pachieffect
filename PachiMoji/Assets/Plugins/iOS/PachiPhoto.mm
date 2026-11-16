@@ -102,6 +102,8 @@ extern "C" void PachiPhoto_Pick(const char* outPath, int maxSide)
         PHPickerConfiguration* config = [[PHPickerConfiguration alloc] init];
         config.filter = [PHPickerFilter anyFilterMatchingSubfilters:@[[PHPickerFilter imagesFilter], [PHPickerFilter videosFilter]]];
         config.selectionLimit = 1;
+        // 動画を渡す前に iPhone が「互換性の高い形式」へ作り直すのを止める（2 分の動画で読み込みがとても遅かった）。元の動画のまま受け取る
+        config.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
         PHPickerViewController* picker = [[PHPickerViewController alloc] initWithConfiguration:config];
         gPhotoDelegate = [[PachiPhotoDelegate alloc] init];
         gPhotoDelegate.outPath = path;
