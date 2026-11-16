@@ -82,12 +82,35 @@ namespace PachiMoji.EditorTools
             return tex;
         }
 
-        static void Shoot(string file, int w, int h, int ss, float t, EffectSettings settings, bool withPhoto)
+        /// <summary>
+        /// 演出を選ぶ画面の止め絵の候補を撮る（王道昇格の札と同じ「定時／退社」、540×960）。captures/obi_preview_t*.png。
+        /// 選んだものを Resources/UI/EffectPreview/obi.png に写す
+        /// </summary>
+        public static void Preview()
+        {
+            int code = 0;
+            try
+            {
+                string outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../captures"));
+                Directory.CreateDirectory(outDir);
+                var settings = new EffectSettings { EffectId = "obi" };
+                for (float t = 0; t < 10f; t += 1f)
+                    Shoot(Path.Combine(outDir, $"obi_preview_t{t:0}.png"), 540, 960, 2, t, settings, false, new[] { "定時", "退社" });
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                code = 1;
+            }
+            if (Application.isBatchMode) EditorApplication.Exit(code);
+        }
+
+        static void Shoot(string file, int w, int h, int ss, float t, EffectSettings settings, bool withPhoto, string[] words = null)
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             // 新しい場面を作ると、それより前に作った画像は消されるので、写真はここで作る
             var photo = withPhoto ? TestPhoto() : null;
-            var st = ObiStage.Build(Words, (float)w / h, settings, photo);
+            var st = ObiStage.Build(words ?? Words, (float)w / h, settings, photo);
             st.Evaluate(t);
             var big = new RenderTexture(w * ss, h * ss, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             var small = new RenderTexture(w, h, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
