@@ -48,4 +48,25 @@ namespace PachiMoji.Tests
             Assert.AreEqual("最後まで見ると書き出せます", ExportGate.NotWatched);
         }
     }
+
+    public class PickGateTests
+    {
+        static readonly string Net = PickGate.Message(GateAction.NeedNetwork), Wait = PickGate.Message(GateAction.Wait);
+
+        [Test]
+        public void 選ぶときの知らせの文()
+        {
+            Assert.AreEqual("ネットにつなぐと、この演出を選べます", Net);
+            Assert.AreEqual("広告を読み込んでいます。少し待ってから、もう一度押してください", Wait);
+            Assert.AreEqual("", PickGate.Message(GateAction.ShowAd));
+            Assert.AreEqual("", PickGate.Message(GateAction.ExportNow));
+            Assert.AreEqual("広告を最後まで見ると、この演出を選べます", PickGate.NotWatched);
+        }
+
+        [Test] public void 読み込めたら待ちの知らせを消す() => Assert.AreEqual("", PickGate.NoticeFor(GateAction.ShowAd, Wait));
+        [Test] public void ネットがつながったらネットの知らせを消す() => Assert.AreEqual("", PickGate.NoticeFor(GateAction.ShowAd, Net));
+        [Test] public void 待ちのあいだにネットが切れたらネットの知らせ() => Assert.AreEqual(Net, PickGate.NoticeFor(GateAction.NeedNetwork, Wait));
+        [Test] public void 見なかった知らせは残す() => Assert.AreEqual(PickGate.NotWatched, PickGate.NoticeFor(GateAction.ShowAd, PickGate.NotWatched));
+        [Test] public void 何も出ていなければ出さない() => Assert.AreEqual("", PickGate.NoticeFor(GateAction.Wait, ""));
+    }
 }

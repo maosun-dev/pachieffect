@@ -5,6 +5,15 @@ namespace PachiMoji
     /// <summary>背景に入れたものが写真か動画か（拡張子で見分ける。動画はアプリの中で mp4 に写す）</summary>
     public static class MediaKind
     {
+        /// <summary>
+        /// 背景に動画を選べるか。1.1 では選ばせない（iPhone で動画が映らず、読み込みも遅かったため）。
+        /// 動画は、のちに作る動画編集の道具で扱い直す。true に戻すと、選ぶ画面（PachiPhoto.mm の絞り込みも）と文言が動画ありに戻る
+        /// </summary>
+        public static readonly bool VideoEnabled = false;
+
+        /// <summary>画面に出す呼び名（「写真・動画」か「写真」）</summary>
+        public static string Label => VideoEnabled ? "写真・動画" : "写真";
+
         public static bool IsVideo(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;

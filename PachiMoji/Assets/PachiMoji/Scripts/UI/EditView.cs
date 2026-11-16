@@ -93,7 +93,7 @@ namespace PachiMoji
             bar.anchoredPosition = new Vector2(0, UiTheme.BannerHeight);
             bar.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.85f);
             var mid = new Vector2(0.5f, 0.5f);
-            string[] names = { "写真・動画", "上の帯", "下の帯" };
+            string[] names = { MediaKind.Label, "上の帯", "下の帯" };
             for (int i = 0; i < 3; i++)
             {
                 int k = i;
@@ -103,7 +103,7 @@ namespace PachiMoji
                 m.tabs[i].onClick.AddListener(() => m.Select((Target)k));
                 m.tabs[i].gameObject.AddComponent<CanvasGroup>();
             }
-            m.Pick = MainScreen.PlateButton(bar, "写真・動画を入れる", mid, new Vector2(-118, -30), new Vector2(110, 44), UiTheme.Body, 12, UiTheme.Chrome);
+            m.Pick = MainScreen.PlateButton(bar, MediaKind.Label + "を入れる", mid, new Vector2(-118, -30), new Vector2(110, 44), UiTheme.Body, 12, UiTheme.Chrome);
             m.pickText = m.Pick.GetComponentInChildren<TMP_Text>();
             m.Remove = MainScreen.PlateButton(bar, "外す", mid, new Vector2(0, -30), new Vector2(110, 44), UiTheme.Body, 14, UiTheme.Chrome);
             m.Reset = MainScreen.PlateButton(bar, "元に戻す", mid, new Vector2(-118, -30), new Vector2(110, 44), UiTheme.Body, 14, UiTheme.Chrome);
@@ -236,7 +236,7 @@ namespace PachiMoji
         public void SetHasMedia(bool on)
         {
             hasMedia = on;
-            pickText.text = on ? "写真・動画を変える" : "写真・動画を入れる";
+            pickText.text = MediaKind.Label + (on ? "を変える" : "を入れる");
             Select(Current);
         }
 
@@ -260,7 +260,7 @@ namespace PachiMoji
             Reset.gameObject.SetActive(!media);
             rangeBox.gameObject.SetActive(media && vLength > 0);
             hint.text = media
-                ? (hasMedia ? "写真・動画を、指で動かす・2本の指で大きさを変える" : "写真・動画を入れると、帯の後ろに映ります")
+                ? (hasMedia ? MediaKind.Label + "を、指で動かす・2本の指で大きさを変える" : MediaKind.Label + "を入れると、帯の後ろに映ります")
                 : (t == Target.Top ? "上の帯を、指で動かす・2本の指で大きさを変える" : "下の帯を、指で動かす・2本の指で大きさを変える");
         }
 

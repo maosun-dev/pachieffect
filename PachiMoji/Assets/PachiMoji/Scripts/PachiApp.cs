@@ -24,6 +24,7 @@ namespace PachiMoji
         Shop shop;
         Ads ads;
         float gateCheckT;   // ネットのつながりを確かめ直すまで（秒）
+        bool pickAdShowing; // 演出を選ぶための広告を見せている（二度押しで広告を重ねない）
         string builtKey;
         InputCheck check;
         MainScreen ui;
@@ -44,6 +45,13 @@ namespace PachiMoji
         {
             Application.targetFrameRate = 60;
             settings = EffectSettings.Load();
+            // 動画を選べない版：前の版（TestFlight）で入れた動画が残っていたら外す
+            if (!MediaKind.VideoEnabled && MediaKind.IsVideo(settings.PhotoPath))
+            {
+                PhotoStore.Delete(settings.PhotoPath);
+                settings.PhotoPath = "";
+                settings.Save();
+            }
 
             uiCam = MainScreen.CreateUiCamera();
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
@@ -92,6 +100,8 @@ namespace PachiMoji
             shopUi.Restore.onClick.AddListener(shop.Restore);
             ads = new Ads();
             ads.Changed += RefreshExportGate;
+            // 選ぶ画面の「読み込んでいます」「ネットにつなぐと」の知らせも、広告の具合に合わせて決め直す
+            ads.Changed += () => { if (state == AppState.EffectPick) effectUi.ShowNotice(PickGate.NoticeFor(Gate(), effectUi.Notice)); };
             ads.Start(shop.Owned.ShowAds);
             OnShopChanged();
             _ = shop.Connect();
@@ -410,11 +420,41 @@ namespace PachiMoji
         {
             if (!OpenCover(effectUi, AppState.EffectPick)) return;
             effectUi.SetCurrent(settings.EffectId);
+            effectUi.SetShowAds(shop.Owned.ShowAds);
+            effectUi.ShowNotice("");
         }
 
+        // 演出の札を押した：今と違う「広告を見て使う」演出なら、書き出しと同じように広告を最後まで見てから選ぶ
         void OnEffectPicked(string id)
         {
-            if (state != AppState.EffectPick) return;
+            if (state != AppState.EffectPick || pickAdShowing) return;
+            var e = EffectCatalog.Get(id);
+            if (!e.AdToPick || e.Id == EffectCatalog.Get(settings.EffectId).Id) { ApplyEffect(e.Id); return; }
+            effectUi.ShowNotice("");
+            var gate = Gate();
+            switch (gate)
+            {
+                case GateAction.ExportNow:
+                    ApplyEffect(e.Id);
+                    break;
+                case GateAction.ShowAd:
+                    pickAdShowing = true;
+                    ads.ShowRewarded(watched =>
+                    {
+                        pickAdShowing = false;
+                        if (state != AppState.EffectPick) return;
+                        if (watched) ApplyEffect(e.Id);
+                        else effectUi.ShowNotice(PickGate.NotWatched);
+                    });
+                    break;
+                default:
+                    effectUi.ShowNotice(PickGate.Message(gate));
+                    break;
+            }
+        }
+
+        void ApplyEffect(string id)
+        {
             settings.EffectId = id;
             settings.Save();
             CloseEffectPick();
@@ -459,17 +499,17 @@ namespace PachiMoji
             settings.Save();
         }
 
-        // 写真・動画を選ぶ。選べたら前のものを消して、編集を続ける
+        // 写真（・動画）を選ぶ。選べたら前のものを消して、編集を続ける
         void PickPhoto()
         {
             if (state != AppState.PhotoAdjust) return;
             KeepEdit();
             // 選び終わるまで（長い動画は変換に時間がかかる）読み込み中と出して、画面を押せなくする
-            editUi.SetBusy("写真・動画を読み込み中…");
+            editUi.SetBusy(MediaKind.Label + "を読み込み中…");
             PhotoPicker.Pick((r, path, len, rot) =>
             {
                 editUi.SetBusy(null);
-                if (r == PhotoPickResult.Failed) { editUi.ShowMessage("写真・動画を読み込めませんでした。別のものを選んでください"); return; }
+                if (r == PhotoPickResult.Failed) { editUi.ShowMessage(MediaKind.Label + "を読み込めませんでした。別のものを選んでください"); return; }
                 if (r != PhotoPickResult.Picked) return;
                 string old = settings.PhotoPath;
                 settings.PhotoPath = path;

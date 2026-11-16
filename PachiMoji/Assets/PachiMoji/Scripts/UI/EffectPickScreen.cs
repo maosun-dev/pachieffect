@@ -17,6 +17,8 @@ namespace PachiMoji
         public event Action<string> Picked;
         RectTransform panel; CanvasGroup group;
         readonly List<(string id, TMP_Text name, Image bar)> cards = new List<(string, TMP_Text, Image)>();
+        readonly List<TMP_Text> adHints = new List<TMP_Text>();   // 「選ぶときに広告が流れます」（広告を消した人には出さない）
+        TMP_Text notice;
 
         // 演出のひとこと（一覧に無い演出は名前だけ）
         static readonly Dictionary<string, string> Notes = new Dictionary<string, string>
@@ -51,10 +53,18 @@ namespace PachiMoji
             foreach (var e in EffectCatalog.All)
             {
                 float x = (i % 2 == 0 ? -1 : 1) * (cardW + gap) / 2;
-                float y = -96 - (i / 2) * (imgH + 120);
+                float y = -96 - (i / 2) * (imgH + 130);
                 m.cards.Add(m.Card(safe, e, new Vector2(x, y), cardW, imgH));
                 i++;
             }
+
+            // 知らせ（広告を最後まで見なかった・ネットが無い など）：札の並びの下
+            int rows = (EffectCatalog.All.Length + 1) / 2;
+            var noticeRt = MainScreen.Rect(safe, "Notice");
+            MainScreen.Place(noticeRt, top, new Vector2(0, -96 - rows * (imgH + 130) - 12), new Vector2(cardW * 2 + gap, 44));
+            m.notice = MainScreen.Label(noticeRt, "", UiTheme.Body, 13, UiTheme.Chrome);
+            m.notice.textWrappingMode = TextWrappingModes.Normal;
+            m.notice.raycastTarget = false;
 
             MainScreen.SetLayer(m.panel.gameObject, MainScreen.UiLayer);
             m.Show(false);
@@ -65,7 +75,7 @@ namespace PachiMoji
         (string, TMP_Text, Image) Card(RectTransform parent, EffectEntry e, Vector2 pos, float w, float imgH)
         {
             var rt = MainScreen.Rect(parent, "Card " + e.Id);
-            MainScreen.Place(rt, new Vector2(0.5f, 1), pos + new Vector2(0, -(imgH + 110) / 2), new Vector2(w, imgH + 110));
+            MainScreen.Place(rt, new Vector2(0.5f, 1), pos + new Vector2(0, -(imgH + 120) / 2), new Vector2(w, imgH + 120));
             rt.gameObject.AddComponent<Image>().color = Color.clear;   // 押せる範囲
             var b = rt.gameObject.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
@@ -108,6 +118,15 @@ namespace PachiMoji
             MainScreen.Place(noteRt, new Vector2(0.5f, 1), new Vector2(0, -imgH - 74), new Vector2(w, 40));
             var note = MainScreen.Label(noteRt, Notes.TryGetValue(e.Id, out var n) ? n : "", UiTheme.Body, 11, UiTheme.Muted);
             note.textWrappingMode = TextWrappingModes.Normal;
+            note.raycastTarget = false;
+            if (e.AdToPick)
+            {
+                var adRt = MainScreen.Rect(rt, "AdHint");
+                MainScreen.Place(adRt, new Vector2(0.5f, 1), new Vector2(0, -imgH - 108), new Vector2(w, 18));
+                var ad = MainScreen.Label(adRt, PickGate.AdHint, UiTheme.Body, 11, UiTheme.Chrome);
+                ad.raycastTarget = false;
+                adHints.Add(ad);
+            }
             return (e.Id, name, bar);
         }
 
@@ -122,6 +141,16 @@ namespace PachiMoji
                 bar.enabled = on;
             }
         }
+
+        /// <summary>広告を消した人には「選ぶときに広告が流れます」を出さない</summary>
+        public void SetShowAds(bool on)
+        {
+            foreach (var t in adHints) t.enabled = on;
+        }
+
+        public string Notice => notice.text;
+
+        public void ShowNotice(string s) => notice.text = s ?? "";
 
         public void Show(bool on)
         {

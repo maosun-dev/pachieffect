@@ -28,6 +28,7 @@ namespace PachiMoji
                 if (string.IsNullOrEmpty(src) || !File.Exists(src)) { done?.Invoke(PhotoPickResult.Cancelled, null, 0, 0); return; }
                 if (MediaKind.IsVideo(src))
                 {
+                    if (!MediaKind.VideoEnabled) { done?.Invoke(PhotoPickResult.Failed, null, 0, 0); return; }
                     // 手元では変換せずにそのまま写す（長さは分からないので 0＝あとで動画から決める）
                     string v = Path.ChangeExtension(path, Path.GetExtension(src).ToLowerInvariant());
                     File.Copy(src, v, true);

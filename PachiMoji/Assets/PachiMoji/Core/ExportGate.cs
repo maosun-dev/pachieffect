@@ -38,4 +38,28 @@ namespace PachiMoji
             _ => "",
         };
     }
+
+    /// <summary>
+    /// 広告を見て使う演出（激アツの帯）を選ぶときの知らせ。判定は書き出しと同じ ExportGate.Decide
+    /// （広告を消した人はすぐ選べる。ほかは広告を最後まで見てから。ネット・広告が無ければ選べない）
+    /// </summary>
+    public static class PickGate
+    {
+        public const string NotWatched = "広告を最後まで見ると、この演出を選べます";
+        public const string AdHint = "選ぶときに広告が流れます";
+
+        public static string Message(GateAction a) => a switch
+        {
+            GateAction.NeedNetwork => "ネットにつなぐと、この演出を選べます",
+            GateAction.Wait => "広告を読み込んでいます。少し待ってから、もう一度押してください",
+            _ => "",
+        };
+
+        /// <summary>広告の読み込み具合が変わったとき：待ち・ネットの知らせだけ今の判定で決め直す。ほかの知らせは残す</summary>
+        public static string NoticeFor(GateAction a, string current)
+        {
+            bool stale = current == Message(GateAction.Wait) || current == Message(GateAction.NeedNetwork);
+            return stale ? Message(a) : current;
+        }
+    }
 }

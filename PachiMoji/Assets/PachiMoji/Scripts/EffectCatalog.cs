@@ -8,6 +8,7 @@ namespace PachiMoji
         public string Id;
         public string Name;
         public string RequiredProduct;   // 使うのに要る商品（null は無料）
+        public bool AdToPick;            // 選ぶときに、ごほうび広告を最後まで見る（広告を消した人は見ない）
         public Func<IPachiEffect> Create;
     }
 
@@ -17,7 +18,7 @@ namespace PachiMoji
         public static readonly EffectEntry[] All =
         {
             new EffectEntry { Id = "oudou", Name = "王道昇格", RequiredProduct = null, Create = () => new OudouEffect() },
-            new EffectEntry { Id = "obi", Name = "激アツの帯", RequiredProduct = null, Create = () => new ObiEffect() },
+            new EffectEntry { Id = "obi", Name = "激アツの帯", RequiredProduct = null, AdToPick = true, Create = () => new ObiEffect() },
         };
 
         /// <summary>ID から探す。知らない ID なら最初の演出</summary>

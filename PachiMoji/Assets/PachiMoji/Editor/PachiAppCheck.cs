@@ -483,6 +483,10 @@ namespace PachiMoji.EditorTools
             screen.Picked += id => picked = id;
             screen.PressForCheck("oudou");
             Expect(picked == "oudou", "演出の札を押すと、その演出が選ばれる");
+            Expect(EffectCatalog.Get("obi").AdToPick && !EffectCatalog.Get("oudou").AdToPick, "広告を見て選ぶのは激アツの帯だけ");
+            screen.SetCurrent("oudou");
+            screen.SetShowAds(true);
+            screen.ShowNotice(PickGate.NotWatched);   // 見え方の確かめ用に、知らせも出しておく
             Canvas.ForceUpdateCanvases();
             RenderUi(rt, path, uiCam);
         }

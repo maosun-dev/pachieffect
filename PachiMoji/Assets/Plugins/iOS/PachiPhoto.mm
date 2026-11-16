@@ -100,7 +100,8 @@ extern "C" void PachiPhoto_Pick(const char* outPath, int maxSide)
     NSString* path = [NSString stringWithUTF8String:outPath];
     dispatch_async(dispatch_get_main_queue(), ^{
         PHPickerConfiguration* config = [[PHPickerConfiguration alloc] init];
-        config.filter = [PHPickerFilter anyFilterMatchingSubfilters:@[[PHPickerFilter imagesFilter], [PHPickerFilter videosFilter]]];
+        // 1.1 では写真だけを選ばせる（C# の MediaKind.VideoEnabled と合わせる。動画は動画編集の道具で扱い直す）
+        config.filter = [PHPickerFilter imagesFilter];
         config.selectionLimit = 1;
         // 動画を渡す前に iPhone が「互換性の高い形式」へ作り直すのを止める（2 分の動画で読み込みがとても遅かった）。元の動画のまま受け取る
         config.preferredAssetRepresentationMode = PHPickerConfigurationAssetRepresentationModeCurrent;
