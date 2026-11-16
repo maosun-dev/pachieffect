@@ -465,8 +465,8 @@ namespace PachiMoji
             if (state != AppState.PhotoAdjust) return;
             KeepEdit();
             // 選び終わるまで（長い動画は変換に時間がかかる）読み込み中と出して、画面を押せなくする
-            editUi.SetBusy("写真・動画を読み込み中…\n長い動画は少し時間がかかります");
-            PhotoPicker.Pick((r, path, len) =>
+            editUi.SetBusy("写真・動画を読み込み中…");
+            PhotoPicker.Pick((r, path, len, rot) =>
             {
                 editUi.SetBusy(null);
                 if (r == PhotoPickResult.Failed) { editUi.ShowMessage("写真・動画を読み込めませんでした。別のものを選んでください"); return; }
@@ -478,6 +478,7 @@ namespace PachiMoji
                 // 動画ははじめから全部を使う（長さが分からないときは 0。準備ができたら動画から決める）
                 settings.VideoStart = 0;
                 settings.VideoEnd = len;
+                settings.VideoRotation = rot;
                 settings.Save();
                 if (!string.IsNullOrEmpty(old) && old != path) PhotoStore.Delete(old);
                 Rebuild();

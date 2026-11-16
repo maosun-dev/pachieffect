@@ -257,14 +257,20 @@ namespace PachiMoji
         Material photoMat;
         Vector2 photoOffset; float photoZoom = 1;
 
-        /// <summary>背景の絵（写真・動画の板）を差し替える。aspect は横÷縦</summary>
-        public void SetMedia(Texture tex, float aspect)
+        /// <summary>
+        /// 背景の絵（写真・動画の板）を差し替える。aspect は絵そのものの横÷縦、rotation は表示するとき回す角度（時計回りの度）。
+        /// 縦に撮った動画は、中身が横倒しのまま入っているので、板を回して正しい向きで見せる
+        /// </summary>
+        public void SetMedia(Texture tex, float aspect, int rotation = 0)
         {
             if (photoMat == null) return;
             photoMat.SetTexture("_MainTex", tex != null ? tex : Texture2D.blackTexture);
-            photoAspect = aspect;
+            photoRot = ((rotation % 360) + 360) % 360;
+            photoAspect = photoRot == 90 || photoRot == 270 ? 1 / aspect : aspect;   // 見たときの横÷縦
+            if (photoQuad != null) photoQuad.localRotation = Quaternion.Euler(0, 0, -photoRot);
             SetPhotoFit(photoOffset, photoZoom);
         }
+        int photoRot;
 
         /// <summary>写真のずらし・倍率を変える（組み立て直さずに写真の板だけ動かす）</summary>
         public void SetPhotoFit(Vector2 offset, float zoom)
@@ -274,7 +280,9 @@ namespace PachiMoji
             var size = PhotoFit.Size(photoAspect, zoom, frameAspect) * frameW;
             var off = PhotoFit.ClampOffset(offset, photoAspect, zoom, frameAspect) * frameW;
             photoQuad.localPosition = new Vector3(off.x, off.y, PhotoZ);
-            photoQuad.localScale = new Vector3(size.x, size.y, 1);
+            // 板を 90 度回しているときは、板の横と縦が入れ替わる
+            bool side = photoRot == 90 || photoRot == 270;
+            photoQuad.localScale = side ? new Vector3(size.y, size.x, 1) : new Vector3(size.x, size.y, 1);
         }
 
         /// <summary>ブルーバックの青（動画編集の「クロマキー」で抜く。金の字の反対の色なので、字のまわりの光のにじみが字に近い色にならない）</summary>

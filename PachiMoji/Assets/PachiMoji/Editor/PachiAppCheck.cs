@@ -697,7 +697,7 @@ namespace PachiMoji.EditorTools
 
             Environment.SetEnvironmentVariable("PACHI_PHOTO", src);
             PhotoPickResult got = PhotoPickResult.Failed; string path = null;
-            PhotoPicker.Pick((r, p, _) => { got = r; path = p; });
+            PhotoPicker.Pick((r, p, _, _) => { got = r; path = p; });
             Environment.SetEnvironmentVariable("PACHI_PHOTO", null);
             Expect(got == PhotoPickResult.Picked && path != null && File.Exists(path), "写真を選ぶと端末の中に写る");
             var tex = PhotoStore.Load(path);
@@ -722,7 +722,7 @@ namespace PachiMoji.EditorTools
             Expect(PhotoStore.Load(broken) == null, "壊れた写真は読まない");
             Expect(PhotoStore.Load(Path.Combine(tmp, "none.jpg")) == null && PhotoStore.Load("") == null, "無い写真は読まない");
 
-            PhotoPicker.Pick((r, p, _) => got = r);
+            PhotoPicker.Pick((r, p, _, _) => got = r);
             Expect(got == PhotoPickResult.Cancelled, "選ぶ写真が無ければやめた扱い");
             DeleteDir(tmp);
         }

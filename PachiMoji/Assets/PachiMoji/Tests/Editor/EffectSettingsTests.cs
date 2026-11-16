@@ -11,7 +11,7 @@ namespace PachiMoji.Tests
         [TearDown]
         public void Clean()
         {
-            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS", "exportWide", "obiLayout", "obiSpin", "videoStart", "videoEnd" }) PlayerPrefs.DeleteKey(P + k);
+            foreach (var k in new[] { "sparks", "light", "size", "font", "from", "to", "firstText", "firstBack", "chain", "teaseCount", "teaseText", "teaseBack", "effect", "photo", "photoX", "photoY", "photoZoom", "obiDepth", "obiRed", "obiGlow", "obiGlowAmount", "obiBlueBack", "obiTopX", "obiTopY", "obiTopS", "obiBotX", "obiBotY", "obiBotS", "exportWide", "obiLayout", "obiSpin", "videoStart", "videoEnd", "videoRot" }) PlayerPrefs.DeleteKey(P + k);
         }
 
         [Test]
@@ -298,8 +298,9 @@ namespace PachiMoji.Tests
             var d = EffectSettings.Load(P);
             Assert.AreEqual(0f, d.VideoStart);
             Assert.AreEqual(0f, d.VideoEnd);
-            new EffectSettings { VideoStart = 1.5f, VideoEnd = 7.25f }.Save(P);
+            new EffectSettings { VideoStart = 1.5f, VideoEnd = 7.25f, VideoRotation = 90 }.Save(P);
             var s = EffectSettings.Load(P);
+            Assert.AreEqual(90, s.VideoRotation);
             Assert.AreEqual(1.5f, s.VideoStart, 1e-5f);
             Assert.AreEqual(7.25f, s.VideoEnd, 1e-5f);
         }

@@ -38,7 +38,8 @@ namespace PachiMoji
             if (isVideo && !PhotoMissing)
             {
                 video = new ObiVideo(settings.PhotoPath, videoStart, videoEnd, stage.cam.transform.parent);
-                video.OnReady += (tex, a) => stage?.SetMedia(tex, a);
+                int rot = settings.VideoRotation;
+                video.OnReady += (tex, a) => stage?.SetMedia(tex, a, rot);
             }
         }
 
